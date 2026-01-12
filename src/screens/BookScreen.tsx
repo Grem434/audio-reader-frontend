@@ -141,12 +141,17 @@ export function BookScreen() {
       // O podemos llamar a generateMissing del backend si hiciera algo, pero solo devuelve lista.
       // Así que llamamos a generateAudio sin rango = todo el libro.
       // toast("Solicitando generación completa (puede tardar)..."); // <-- Ruido visual
-      await generateAudioRange({
+      const res: any = await generateAudioRange({
         userId,
         bookId,
         voice,
         style
       });
+
+      if (res && res.generatedChapters === 0) {
+        alert(`Ojo: El backend dice que ha generado 0 capítulos. \nMsg: ${res.message}\nError: ${JSON.stringify(res.error || res.details || "")}`);
+      }
+
       // toast("Proceso iniciado."); // <-- Ya tenemos el loading overlay
       await refresh(false);
       toast("Generación completada / actualizada.");
