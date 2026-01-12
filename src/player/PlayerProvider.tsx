@@ -79,14 +79,21 @@ function safeNum(x: any, fallback = 0) {
 
 // Importante: tu VITE_API_URL suele ser ".../api". Para audios necesitamos el ORIGIN (sin /api)
 function getApiOrigin(): string {
-  const raw = (import.meta as any).env?.VITE_API_URL || "http://localhost:3001";
-  return String(raw).replace(/\/api\/?$/, "");
+  // Misma lógica que apiClient para consistencia
+  const envUrl = (import.meta as any).env?.VITE_BACKEND_URL; // e.g. https://...railway.app
+  if (envUrl) return envUrl.replace(/\/+$/, "");
+
+  // Fallback duro a producción, igual que apiClient (para que funcione sin .env local)
+  return "https://audio-reader-backend-production.up.railway.app";
 }
 
 function audioUrlFromPath(audio_path: string): string {
   if (!audio_path) return "";
   if (/^https?:\/\//i.test(audio_path)) return audio_path;
-  return `${getApiOrigin()}${audio_path.startsWith("/") ? "" : "/"}${audio_path}`;
+  const origin = getApiOrigin();
+  // audio_path suele venir como "/audio/..." o "audio/..."
+  const cleanPath = audio_path.startsWith("/") ? audio_path : `/${audio_path}`;
+  return `${origin}${cleanPath}`;
 }
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
@@ -143,7 +150,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         positionSeconds: cur,
         voice,
         style,
-      }).catch(() => {});
+      }).catch(() => { });
     };
 
     const onPlay = () => setS((prev) => ({ ...prev, isPlaying: true }));
@@ -311,7 +318,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         if (prevIndex < 0) return;
         try {
           await loadAndPlayByIndex(chapters, prevIndex, bookId, bookTitle, voice, style);
-        } catch {}
+        } catch { }
       },
 
       setRate: (r) => setS((prev) => ({ ...prev, rate: clamp(r, 0.5, 3) })),

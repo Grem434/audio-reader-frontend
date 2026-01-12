@@ -47,8 +47,33 @@ async function apiFetch<T>({ method = "GET", path, userId, body }: FetchOpts): P
 
 // ---------- BOOKS ----------
 
-export async function listBooks() {
-  return apiFetch<any[]>({ path: `/api/books` });
+export async function listBooks(args?: { userId?: string | null }) {
+  return apiFetch<any[]>({
+    path: `/api/books`,
+    userId: args?.userId ?? null
+  });
+}
+
+export async function uploadBook(args: { userId?: string | null; file: File }) {
+  const formData = new FormData();
+  formData.append("file", args.file);
+
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+  };
+  if (args.userId) headers["x-user-id"] = args.userId;
+
+  const res = await fetch(`${(import.meta as any).env?.VITE_BACKEND_URL?.replace(/\/+$/, "") || "https://audio-reader-backend-production.up.railway.app"}/api/books/upload`, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(txt || `Error uploading: ${res.status}`);
+  }
+  return res.json();
 }
 
 export async function getBook(args: { userId?: string | null; bookId: string; voice?: string; style?: string }) {
@@ -115,9 +140,11 @@ export async function generateMissing(args: { userId?: string | null; bookId: st
 
 // ---------- BOOKMARKS / CONTINUE ----------
 
-export async function getContinue(args: { userId?: string | null; bookId: string }) {
+export async function getContinue(args: { userId?: string | null; bookId: string; voice?: string; style?: string }) {
+  const voice = args.voice || DEFAULT_VOICE;
+  const style = args.style || DEFAULT_STYLE;
   return apiFetch<any>({
-    path: `/api/books/${args.bookId}/continue?voice=${encodeURIComponent(DEFAULT_VOICE)}&style=${encodeURIComponent(DEFAULT_STYLE)}`,
+    path: `/api/books/${args.bookId}/continue?voice=${encodeURIComponent(voice)}&style=${encodeURIComponent(style)}`,
     userId: args.userId ?? null,
   });
 }
@@ -127,6 +154,8 @@ export async function saveBookmark(args: {
   bookId: string;
   chapterId: string;
   positionSeconds: number;
+  voice?: string;
+  style?: string;
 }) {
   return apiFetch<any>({
     method: "POST",
@@ -135,8 +164,8 @@ export async function saveBookmark(args: {
     body: {
       chapterId: args.chapterId,
       positionSeconds: args.positionSeconds,
-      voice: DEFAULT_VOICE,
-      style: DEFAULT_STYLE,
+      voice: args.voice || DEFAULT_VOICE,
+      style: args.style || DEFAULT_STYLE,
     },
   });
 }

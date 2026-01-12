@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { LibraryScreen } from "./screens/LibraryScreen";
 import { BookScreen } from "./screens/BookScreen";
+import { PlayerScreen } from "./screens/PlayerScreen";
 import { AuthScreen } from "./screens/AuthScreen";
 import { RecoveryScreen } from "./screens/RecoveryScreen";
 import { useApp } from "./app/AppContext";
@@ -41,6 +42,7 @@ export default function App() {
         <Route path="/" element={<Navigate to="/library" replace />} />
         <Route path="/library" element={<LibraryScreen />} />
         <Route path="/book/:bookId" element={<BookScreen />} />
+        <Route path="/player" element={<PlayerScreen />} />
         <Route path="*" element={<Navigate to="/library" replace />} />
       </Routes>
     </>

@@ -37,27 +37,15 @@ export const VOICES = [
   { id: "onyx", label: "Onyx" },
   { id: "nova", label: "Nova" },
   { id: "shimmer", label: "Shimmer" },
-  { id: "coral", label: "Coral" },
-  { id: "verse", label: "Verse" },
-  { id: "ballad", label: "Ballad" },
-  { id: "ash", label: "Ash" },
-  { id: "sage", label: "Sage" },
-  { id: "marin", label: "Marin" },
-  { id: "cedar", label: "Cedar" },
 ] as const;
 
 export const STYLES = [
-  { id: "neutral", label: "Neutral" },
-  { id: "warm", label: "Cálido" },
-  { id: "energetic", label: "Enérgico" }
+  { id: "learning", label: "Aprendizaje" }
 ] as const;
 
 type VoiceId = typeof VOICES[number]["id"];
 type StyleId = typeof STYLES[number]["id"];
 
-
-const isValidVoice = (v: any): v is VoiceId => VOICES.some(x => x.id === v);
-const isValidStyle = (v: any): v is StyleId => STYLES.some(x => x.id === v);
 
 type AppCtx = {
   userId: string;
