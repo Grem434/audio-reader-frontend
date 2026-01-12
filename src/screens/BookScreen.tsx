@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { deleteAudios, generateAudioRange, getBook } from "../apiClient";
 import type { Chapter } from "../types";
-import { useApp, VOICES, STYLES } from "../app/AppContext";
+import { useApp, VOICES } from "../app/AppContext";
 import { useToast } from "../ui/Toast";
 import { usePlayer } from "../player/PlayerProvider";
 import { BottomSheet } from "../ui/BottomSheet";
@@ -15,16 +15,12 @@ spinStyle.innerHTML = `
 `;
 document.head.appendChild(spinStyle);
 
-function clamp(n: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, n));
-}
-
 export function BookScreen() {
   const { bookId: paramBookId } = useParams();
   const bookId = paramBookId || "";
   const nav = useNavigate();
 
-  const { userId, voice, style, setVoice, setStyle } = useApp();
+  const { userId, voice, style, setVoice } = useApp();
   const { toast } = useToast();
   const player = usePlayer();
 
@@ -34,13 +30,12 @@ export function BookScreen() {
   const [err, setErr] = useState<string | null>(null);
 
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [rangeStart, setRangeStart] = useState(1);
-  const [rangeEnd, setRangeEnd] = useState(1);
   const [busy, setBusy] = useState(false);
 
   const readyCount = useMemo(() => chapters.filter(c => !!c.audio_path).length, [chapters]);
 
-  async function refresh(resetRange: boolean) {
+  async function refresh() {
+    // resetRange ignorado por ahora
     if (!bookId) return;
     setLoading(true);
     setErr(null);
@@ -48,14 +43,6 @@ export function BookScreen() {
       const data = await getBook({ userId, bookId, voice, style });
       setBookTitle(data.book.title);
       setChapters(data.chapters);
-
-      if (resetRange) {
-        setRangeStart(1);
-        setRangeEnd(Math.min(1, data.chapters.length || 1));
-      } else {
-        setRangeStart(s => clamp(s, 1, data.chapters.length || 1));
-        setRangeEnd(e => clamp(e, 1, data.chapters.length || 1));
-      }
     } catch (e: any) {
       setErr(e?.message || "Error cargando libro");
     } finally {
@@ -64,12 +51,12 @@ export function BookScreen() {
   }
 
   useEffect(() => {
-    void refresh(true);
+    void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookId]);
 
   useEffect(() => {
-    if (bookId) void refresh(false);
+    if (bookId) void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [voice, style]);
 
@@ -93,26 +80,6 @@ export function BookScreen() {
     if (ok) nav("/player");
   }
 
-  async function genRange() {
-    setBusy(true);
-    try {
-      await generateAudioRange({
-        userId,
-        bookId,
-        startIndex: clamp(rangeStart - 1, 0, Math.max(0, chapters.length - 1)),
-        endIndex: clamp(rangeEnd - 1, 0, Math.max(0, chapters.length - 1)),
-        voice,
-        style
-      });
-      toast("Rango generado.");
-      await refresh(false);
-    } catch (e: any) {
-      toast(e?.message || "Error generando rango");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function genSingleChapter(ch: Chapter) {
     setBusy(true);
     try {
@@ -125,7 +92,7 @@ export function BookScreen() {
         style
       });
       toast("Capítulo generado.");
-      await refresh(false);
+      await refresh();
     } catch (e: any) {
       toast(e?.message || "Error generando capítulo");
     } finally {
@@ -153,7 +120,7 @@ export function BookScreen() {
       }
 
       // toast("Proceso iniciado."); // <-- Ya tenemos el loading overlay
-      await refresh(false);
+      await refresh();
       toast("Generación completada / actualizada.");
     } catch (e: any) {
       toast(e?.message || "Error generando faltantes");
@@ -169,7 +136,7 @@ export function BookScreen() {
       try {
         await deleteAudios({ userId, bookId, voice: "", style: "" });
         toast("Audios eliminados (todos).");
-        await refresh(false);
+        await refresh();
       } catch (e: any) {
         toast(e?.message || "Error borrando audios");
       } finally {
@@ -183,7 +150,7 @@ export function BookScreen() {
     try {
       await deleteAudios({ userId, bookId, voice, style });
       toast("Audios eliminados (voz/modo actual).");
-      await refresh(false);
+      await refresh();
     } catch (e: any) {
       toast(e?.message || "Error borrando audios");
     } finally {
@@ -302,79 +269,63 @@ export function BookScreen() {
         )}
       </div>
 
-      <BottomSheet open={sheetOpen} title="Audio" onClose={() => setSheetOpen(false)}>
-        <div style={{ display: "grid", gap: 12 }}>
+      <BottomSheet open={sheetOpen} title="Configuración de Audio" onClose={() => setSheetOpen(false)}>
+        <div style={{ display: "grid", gap: 20 }}>
+
+          {/* Narrador (antes Voice) */}
           <div>
-            <div className="small muted" style={{ fontWeight: 900, marginBottom: 6 }}>Voz</div>
-            <select className="select" value={voice} onChange={e => setVoice(e.target.value as any)}>
-              {VOICES.map(v => (
-                <option key={v.id} value={v.id}>{v.label}</option>
-              ))}
-            </select>
+            <div className="small muted" style={{ fontWeight: 600, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Narrador</div>
+            <div style={{ position: "relative" }}>
+              <select className="select" value={voice} onChange={e => setVoice(e.target.value as any)}>
+                {VOICES.map(v => (
+                  <option key={v.id} value={v.id}>{v.label}</option>
+                ))}
+              </select>
+              <div style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>⌄</div>
+            </div>
+            <div className="small muted" style={{ marginTop: 6, lineHeight: 1.4 }}>
+              Cada narrador tiene su propia "personalidad". Elige el que más te guste para este libro.
+            </div>
           </div>
+
+          {/* Ocultamos Style (Modo) - Siempre Learning */}
+          {/* 
+          <div>
+             ...
+          </div>
+          */}
+
+          <div className="divider" />
 
           <div>
-            <div className="small muted" style={{ fontWeight: 900, marginBottom: 6 }}>Modo</div>
-            <select className="select" value={style} onChange={e => setStyle(e.target.value as any)}>
-              {STYLES.map(s => (
-                <option key={s.id} value={s.id}>{s.label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="card" style={{ padding: 12 }}>
-            <div style={{ fontWeight: 950, marginBottom: 8 }}>Generación</div>
-            <button className="btn btnPrimary" onClick={() => void genMissing()} disabled={busy}>
-              ⚡ Generar faltantes
+            <div className="small muted" style={{ fontWeight: 600, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Acciones</div>
+            <button
+              className="btn btnPrimary"
+              style={{ width: "100%", justifyContent: "center", fontSize: 16 }}
+              onClick={() => { setSheetOpen(false); void genMissing(); }}
+              disabled={busy}
+            >
+              ✨ Generar Audio del Libro
             </button>
-
-            <div style={{ height: 10 }} />
-
-            <div className="small muted" style={{ fontWeight: 900, marginBottom: 6 }}>Generar rango (1-based)</div>
-            <div style={{ display: "flex", gap: 10 }}>
-              <input
-                className="input"
-                type="number"
-                value={rangeStart}
-                min={1}
-                max={chapters.length || 1}
-                onChange={e => setRangeStart(Number(e.target.value || 1))}
-              />
-              <input
-                className="input"
-                type="number"
-                value={rangeEnd}
-                min={1}
-                max={chapters.length || 1}
-                onChange={e => setRangeEnd(Number(e.target.value || 1))}
-              />
-            </div>
-            <div style={{ height: 10 }} />
-            <button className="btn" onClick={() => void genRange()} disabled={busy}>
-              Generar rango
-            </button>
-
-            <div className="small muted" style={{ marginTop: 8 }}>
-              Capítulos: 1..{chapters.length}
+            <div className="small muted" style={{ marginTop: 8, textAlign: "center" }}>
+              Generará todo lo que falte con el narrador seleccionado.
             </div>
           </div>
 
-          <div className="card" style={{ padding: 12 }}>
-            <div style={{ fontWeight: 950, marginBottom: 8 }}>Borrar audios</div>
-            <button className="btn" onClick={() => void onDeleteAudios("current")} disabled={busy}>
-              🧹 Borrar audios ({voice}/{style})
+          <div style={{ marginTop: 10 }}>
+            <button
+              className="btn"
+              style={{ width: "100%", justifyContent: "center", color: "rgba(255,100,100,0.9)", borderColor: "rgba(255,100,100,0.2)" }}
+              onClick={() => { setSheetOpen(false); onDeleteAudios("all"); }}
+            >
+              🗑️ Borrar audios de este libro
             </button>
-            <div style={{ height: 10 }} />
-            <button className="btn btnDanger" onClick={() => void onDeleteAudios("all")} disabled={busy}>
-              🧨 Borrar TODOS los audios del libro
-            </button>
-            <div className="small muted" style={{ marginTop: 8 }}>
-              Esto no borra el libro, solo los MP3.
-            </div>
           </div>
+
         </div>
       </BottomSheet>
-    </div>
+
+    </div >
   );
 }
 export default BookScreen;
