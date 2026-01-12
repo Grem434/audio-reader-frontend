@@ -45,6 +45,24 @@ async function apiFetch<T>({ method = "GET", path, userId, body }: FetchOpts): P
   return payload as T;
 }
 
+// ---------- AUTH ----------
+
+export async function authLogin(email: string, pass: string) {
+  return apiFetch<{ user: { id: string; email?: string }; session?: any }>({
+    method: "POST",
+    path: "/api/auth/login",
+    body: { email, password: pass },
+  });
+}
+
+export async function authSignup(email: string, pass: string) {
+  return apiFetch<{ user: { id: string; email?: string } }>({
+    method: "POST",
+    path: "/api/auth/signup",
+    body: { email, password: pass },
+  });
+}
+
 // ---------- BOOKS ----------
 
 export async function listBooks(args?: { userId?: string | null }) {
