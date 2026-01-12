@@ -1,240 +1,173 @@
-const API_BASE = "";
+// src/apiClient.ts
+// Simplificado: UNA voz (alloy) + UN estilo (learning)
 
-function headers(userId: string) {
-  return {
-    "x-user-id": userId,
-    "Content-Type": "application/json"
+const API_BASE =
+  (import.meta as any).env?.VITE_BACKEND_URL?.replace(/\/+$/, "") ||
+  "https://audio-reader-backend-production.up.railway.app";
+
+export const DEFAULT_VOICE = "alloy";
+export const DEFAULT_STYLE = "learning";
+
+type FetchOpts = {
+  method?: string;
+  path: string;
+  userId?: string | null;
+  body?: any;
+};
+
+async function apiFetch<T>({ method = "GET", path, userId, body }: FetchOpts): Promise<T> {
+  const headers: Record<string, string> = {
+    Accept: "application/json",
   };
-}
 
-/* ---------------- BOOKS ---------------- */
+  // Solo ponemos x-user-id si tenemos userId (para bookmarks/progreso/audios por usuario).
+  if (userId) headers["x-user-id"] = userId;
 
-export async function listBooks({ userId }: { userId: string }) {
-  const res = await fetch(`${API_BASE}/api/books`, {
-    headers: headers(userId)
-  });
-  if (!res.ok) throw new Error("Error cargando libros");
-  return res.json();
-}
+  if (body !== undefined) headers["Content-Type"] = "application/json";
 
-export async function uploadBook({
-  userId,
-  file
-}: {
-  userId: string;
-  file: File;
-}) {
-  const form = new FormData();
-  form.append("file", file);
-
-  const res = await fetch(`${API_BASE}/api/books/upload`, {
-    method: "POST",
-    headers: { "x-user-id": userId },
-    body: form
+  const res = await fetch(`${API_BASE}${path}`, {
+    method,
+    headers,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 
-  if (!res.ok) {
-    const t = await res.text();
-    throw new Error(t || "Error subiendo libro");
-  }
-
-  return res.json();
-}
-
-export async function getBook({
-  userId,
-  bookId,
-  voice,
-  style
-}: {
-  userId: string;
-  bookId: string;
-  voice: string;
-  style: string;
-}) {
-  const res = await fetch(
-    `${API_BASE}/api/books/${bookId}?voice=${voice}&style=${style}`,
-    { headers: headers(userId) }
-  );
-  if (!res.ok) throw new Error("Error cargando libro");
-  return res.json();
-}
-
-/* ---------------- AUDIO GENERATION ---------------- */
-
-export async function generateAudioRange({
-  userId,
-  bookId,
-  startIndex,
-  endIndex,
-  voice,
-  style
-}: {
-  userId: string;
-  bookId: string;
-  startIndex: number;
-  endIndex: number;
-  voice: string;
-  style: string;
-}) {
-  const res = await fetch(
-    `${API_BASE}/api/books/${bookId}/generate-audio`,
-    {
-      method: "POST",
-      headers: headers(userId),
-      body: JSON.stringify({ startIndex, endIndex, voice, style })
-    }
-  );
+  const isJson = (res.headers.get("content-type") || "").includes("application/json");
+  const payload = isJson ? await res.json().catch(() => null) : await res.text().catch(() => null);
 
   if (!res.ok) {
-    const t = await res.text();
-    throw new Error(t || "Error generando audio");
+    const msg =
+      (payload && typeof payload === "object" && (payload.error || payload.message)) ||
+      (typeof payload === "string" && payload) ||
+      `HTTP ${res.status}`;
+    throw new Error(msg);
   }
 
-  return res.json();
+  return payload as T;
 }
 
-export async function generateMissing({
-  userId,
-  bookId,
-  voice,
-  style
-}: {
-  userId: string;
-  bookId: string;
-  voice: string;
-  style: string;
-}) {
-  const res = await fetch(
-    `${API_BASE}/api/books/${bookId}/generate-missing`,
-    {
-      method: "POST",
-      headers: headers(userId),
-      body: JSON.stringify({ voice, style })
-    }
-  );
+// ---------- BOOKS ----------
 
-  if (!res.ok) {
-    const t = await res.text();
-    throw new Error(t || "Error generando faltantes");
-  }
-
-  return res.json();
+export async function listBooks() {
+  return apiFetch<any[]>({ path: `/api/books` });
 }
 
-/* ---------------- CONTINUE / BOOKMARK ---------------- */
-
-export async function getContinue({
-  userId,
-  bookId,
-  voice,
-  style
-}: {
-  userId: string;
-  bookId: string;
-  voice: string;
-  style: string;
-}) {
-  const res = await fetch(
-    `${API_BASE}/api/books/${bookId}/continue?voice=${voice}&style=${style}`,
-    { headers: headers(userId) }
-  );
-  if (!res.ok) throw new Error("Error obteniendo continuar");
-  return res.json();
+export async function getBook(args: { userId?: string | null; bookId: string; voice?: string; style?: string }) {
+  // Nota: aunque la librería sea compartida, enviamos userId si existe
+  // para que el backend pueda devolver audios/bookmarks de ESE usuario.
+  const voice = args.voice || DEFAULT_VOICE;
+  const style = args.style || DEFAULT_STYLE;
+  return apiFetch<{
+    book: any;
+    chapters: Array<{ id: string; book_id: string; index_in_book: number; title: string | null; audio_path: string | null }>;
+    voice: string;
+    style: string;
+  }>({
+    path: `/api/books/${args.bookId}?voice=${encodeURIComponent(voice)}&style=${encodeURIComponent(style)}`,
+    userId: args.userId ?? null,
+  });
 }
 
-export async function saveBookmark({
-  userId,
-  bookId,
-  chapterId,
-  positionSeconds
-}: {
-  userId: string;
-  bookId: string;
-  chapterId: string;
-  positionSeconds: number;
-}) {
-  const res = await fetch(
-    `${API_BASE}/api/books/${bookId}/bookmark`,
-    {
-      method: "POST",
-      headers: headers(userId),
-      body: JSON.stringify({ chapterId, positionSeconds })
-    }
-  );
-
-  if (!res.ok) throw new Error("Error guardando bookmark");
-  return res.json();
-}
-
-/* ---------------- RECAP ---------------- */
-
-export async function recapChapter({
-  userId,
-  bookId,
-  chapterId,
-  positionSeconds
-}: {
-  userId: string;
-  bookId: string;
-  chapterId: string;
-  positionSeconds: number;
-}) {
-  const res = await fetch(
-    `${API_BASE}/api/books/${bookId}/recap`,
-    {
-      method: "POST",
-      headers: headers(userId),
-      body: JSON.stringify({ chapterId, positionSeconds })
-    }
-  );
-
-  if (!res.ok) {
-    const t = await res.text();
-    throw new Error(t || "Error generando resumen");
-  }
-
-  return res.json();
-}
-
-/* ---------------- DELETE ---------------- */
-
-export async function deleteBook({
-  userId,
-  bookId
-}: {
-  userId: string;
-  bookId: string;
-}) {
-  const res = await fetch(`${API_BASE}/api/books/${bookId}`, {
+export async function deleteBook(args: { userId?: string | null; bookId: string }) {
+  return apiFetch<{ ok: boolean }>({
     method: "DELETE",
-    headers: headers(userId)
+    path: `/api/books/${args.bookId}`,
+    userId: args.userId ?? null,
   });
-
-  if (!res.ok) throw new Error("Error eliminando libro");
 }
 
-export async function deleteAudios({
-  userId,
-  bookId,
-  voice,
-  style
-}: {
-  userId: string;
+// ---------- AUDIO GENERATION ----------
+
+export async function generateAudio(args: {
+  userId?: string | null;
+  bookId: string;
+  startIndex?: number | null;
+  endIndex?: number | null;
+  voice?: string;
+  style?: string;
+}) {
+  // Backend: /generate-audio
+  return apiFetch<any>({
+    method: "POST",
+    path: `/api/books/${args.bookId}/generate-audio`,
+    userId: args.userId ?? null,
+    body: {
+      voice: args.voice || DEFAULT_VOICE,
+      style: args.style || DEFAULT_STYLE,
+      startIndex: args.startIndex ?? null,
+      endIndex: args.endIndex ?? null,
+    },
+  });
+}
+
+export async function generateMissing(args: { userId?: string | null; bookId: string }) {
+  // Si tu backend lo llama /generate-missing, dejamos este wrapper.
+  // Si NO existe en tu backend, bórralo del frontend.
+  return apiFetch<any>({
+    method: "POST",
+    path: `/api/books/${args.bookId}/generate-missing`,
+    userId: args.userId ?? null,
+    body: {
+      voice: DEFAULT_VOICE,
+      style: DEFAULT_STYLE,
+    },
+  });
+}
+
+// ---------- BOOKMARKS / CONTINUE ----------
+
+export async function getContinue(args: { userId?: string | null; bookId: string }) {
+  return apiFetch<any>({
+    path: `/api/books/${args.bookId}/continue?voice=${encodeURIComponent(DEFAULT_VOICE)}&style=${encodeURIComponent(DEFAULT_STYLE)}`,
+    userId: args.userId ?? null,
+  });
+}
+
+export async function saveBookmark(args: {
+  userId?: string | null;
+  bookId: string;
+  chapterId: string;
+  positionSeconds: number;
+}) {
+  return apiFetch<any>({
+    method: "POST",
+    path: `/api/books/${args.bookId}/bookmark`,
+    userId: args.userId ?? null,
+    body: {
+      chapterId: args.chapterId,
+      positionSeconds: args.positionSeconds,
+      voice: DEFAULT_VOICE,
+      style: DEFAULT_STYLE,
+    },
+  });
+}
+
+// ---------- AUDIO DELETION ----------
+
+export async function deleteAudios(args: {
+  userId?: string | null;
   bookId: string;
   voice?: string;
   style?: string;
 }) {
-  const qs =
-    voice && style ? `?voice=${voice}&style=${style}` : "";
+  const params = new URLSearchParams();
+  if (args.voice) params.set("voice", args.voice);
+  if (args.style) params.set("style", args.style);
 
-  const res = await fetch(
-    `${API_BASE}/api/books/${bookId}/audios${qs}`,
-    {
-      method: "DELETE",
-      headers: headers(userId)
-    }
-  );
+  return apiFetch<any>({
+    method: "DELETE",
+    path: `/api/books/${args.bookId}/audios?${params.toString()}`,
+    userId: args.userId ?? null,
+  });
+}
 
-  if (!res.ok) throw new Error("Error eliminando audios");
+// Alias para compatibilidad con BookScreen
+export const generateAudioRange = generateAudio;
+
+// ---------- AUDIO URL ----------
+
+export function toAbsoluteAudioUrl(audioPath: string) {
+  // audioPath viene tipo "/audio/....mp3"
+  if (!audioPath) return "";
+  if (/^https?:\/\//i.test(audioPath)) return audioPath;
+  return `${API_BASE}${audioPath.startsWith("/") ? "" : "/"}${audioPath}`;
 }

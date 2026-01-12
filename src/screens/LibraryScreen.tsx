@@ -14,7 +14,7 @@ function formatDate(iso: string) {
 }
 
 export function LibraryScreen() {
-  const { userId } = useApp();
+  const { userId } = useApp(); // sigue existiendo: se usa para subir/borrar
   const { toast } = useToast();
   const nav = useNavigate();
 
@@ -25,7 +25,9 @@ export function LibraryScreen() {
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
+  // 📚 REFRESH (usa el userId del contexto)
   async function refresh() {
+    if (!userId) return; // aún no está listo
     setLoading(true);
     setErr(null);
     try {
@@ -41,8 +43,9 @@ export function LibraryScreen() {
   useEffect(() => {
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [userId]);
 
+  // ⬆️ SUBIR (ADMIN)
   async function onUpload(file: File) {
     setUploading(true);
     try {
@@ -57,6 +60,7 @@ export function LibraryScreen() {
     }
   }
 
+  // ❌ BORRAR (ADMIN)
   async function onDelete(b: Book) {
     if (!confirm(`¿Borrar el libro "${b.title}"?`)) return;
     try {
@@ -79,15 +83,26 @@ export function LibraryScreen() {
           paddingTop: "calc(12px + env(safe-area-inset-top))",
           background: "rgba(10,12,16,0.86)",
           backdropFilter: "blur(10px)",
-          borderBottom: "1px solid rgba(255,255,255,0.08)"
+          borderBottom: "1px solid rgba(255,255,255,0.08)",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 10,
+          }}
+        >
           <div>
             <div style={{ fontWeight: 950, fontSize: 18 }}>Biblioteca</div>
             <div className="small muted">Sube PDF/EPUB y escucha en móvil</div>
           </div>
-          <button className="btn" onClick={() => fileRef.current?.click()} disabled={uploading}>
+          <button
+            className="btn"
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+          >
             {uploading ? "Subiendo..." : "＋ Subir"}
           </button>
           <input
@@ -95,7 +110,7 @@ export function LibraryScreen() {
             type="file"
             accept=".pdf,.epub"
             style={{ display: "none" }}
-            onChange={e => {
+            onChange={(e) => {
               const f = e.target.files?.[0];
               if (f) void onUpload(f);
             }}
@@ -112,7 +127,7 @@ export function LibraryScreen() {
           <div className="muted">No hay libros todavía. Sube uno para empezar.</div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {books.map(b => (
+            {books.map((b) => (
               <div key={b.id} className="card">
                 <button
                   onClick={() => nav(`/book/${b.id}`)}
@@ -123,16 +138,22 @@ export function LibraryScreen() {
                     background: "transparent",
                     color: "inherit",
                     padding: 14,
-                    cursor: "pointer"
+                    cursor: "pointer",
                   }}
                 >
-                  <div style={{ fontWeight: 950, fontSize: 15, marginBottom: 4 }}>{b.title}</div>
+                  <div style={{ fontWeight: 950, fontSize: 15, marginBottom: 4 }}>
+                    {b.title}
+                  </div>
                   <div className="small muted">Añadido: {formatDate(b.created_at)}</div>
                 </button>
                 <div className="divider" />
                 <div style={{ padding: 12, display: "flex", justifyContent: "space-between", gap: 10 }}>
-                  <button className="btn" onClick={() => nav(`/book/${b.id}`)}>Abrir</button>
-                  <button className="btn btnDanger" onClick={() => void onDelete(b)}>Borrar</button>
+                  <button className="btn" onClick={() => nav(`/book/${b.id}`)}>
+                    Abrir
+                  </button>
+                  <button className="btn btnDanger" onClick={() => void onDelete(b)}>
+                    Borrar
+                  </button>
                 </div>
               </div>
             ))}

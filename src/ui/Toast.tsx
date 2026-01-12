@@ -9,7 +9,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([]);
 
   const toast = (text: string) => {
-    const id = crypto.randomUUID();
+    const id = (globalThis.crypto && 'randomUUID' in globalThis.crypto) ? globalThis.crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     setItems(prev => [...prev, { id, text }]);
     window.setTimeout(() => {
       setItems(prev => prev.filter(t => t.id !== id));

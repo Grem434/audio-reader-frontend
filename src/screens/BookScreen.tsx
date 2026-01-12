@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { deleteAudios, generateAudioRange, generateMissing, getBook } from "../apiClient";
+import { deleteAudios, generateAudioRange, getBook } from "../apiClient";
 import type { Chapter } from "../types";
 import { useApp, VOICES, STYLES } from "../app/AppContext";
 import { useToast } from "../ui/Toast";
@@ -12,8 +12,8 @@ function clamp(n: number, min: number, max: number) {
 }
 
 export function BookScreen() {
-  const { id } = useParams();
-  const bookId = id || "";
+  const { bookId: paramBookId } = useParams();
+  const bookId = paramBookId || "";
   const nav = useNavigate();
 
   const { userId, voice, style, setVoice, setStyle } = useApp();
@@ -74,26 +74,15 @@ export function BookScreen() {
       return;
     }
 
-    await player.playChapter({ bookId, bookTitle, chapters, index });
+    // IMPORTANTÍSIMO: esto es lo que carga el audio (pone src) y deja listo el player
+    await player.playChapter({ bookId, bookTitle, chapters, index, voice, style });
     nav("/player");
   }
 
-  async function onContinue() {
-    const ok = await player.resumeBook(bookId, bookTitle, chapters);
-    if (ok) nav("/player");
-  }
 
-  async function genMissing() {
-    setBusy(true);
-    try {
-      await generateMissing({ userId, bookId, voice, style });
-      toast("Generación iniciada (faltantes).");
-      await refresh(false);
-    } catch (e: any) {
-      toast(e?.message || "Error generando faltantes");
-    } finally {
-      setBusy(false);
-    }
+  async function onContinue() {
+    const ok = await player.resumeBook(bookId, bookTitle, chapters, voice, style);
+    if (ok) nav("/player");
   }
 
   async function genRange() {
@@ -131,6 +120,29 @@ export function BookScreen() {
       await refresh(false);
     } catch (e: any) {
       toast(e?.message || "Error generando capítulo");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function genMissing() {
+    setBusy(true);
+    try {
+      // Por simplicidad, "Generar faltantes" regenerará todo el libro en segundo plano
+      // o podríamos iterar. Para MVP: generamos todo (backend debe manejarlo).
+      // O podemos llamar a generateMissing del backend si hiciera algo, pero solo devuelve lista.
+      // Así que llamamos a generateAudio sin rango = todo el libro.
+      toast("Solicitando generación completa (puede tardar)...");
+      await generateAudioRange({
+        userId,
+        bookId,
+        voice,
+        style
+      });
+      toast("Proceso iniciado.");
+      await refresh(false);
+    } catch (e: any) {
+      toast(e?.message || "Error generando faltantes");
     } finally {
       setBusy(false);
     }
@@ -262,7 +274,7 @@ export function BookScreen() {
         <div style={{ display: "grid", gap: 12 }}>
           <div>
             <div className="small muted" style={{ fontWeight: 900, marginBottom: 6 }}>Voz</div>
-            <select className="select" value={voice} onChange={e => setVoice(e.target.value)}>
+            <select className="select" value={voice} onChange={e => setVoice(e.target.value as any)}>
               {VOICES.map(v => (
                 <option key={v.id} value={v.id}>{v.label}</option>
               ))}
@@ -271,7 +283,7 @@ export function BookScreen() {
 
           <div>
             <div className="small muted" style={{ fontWeight: 900, marginBottom: 6 }}>Modo</div>
-            <select className="select" value={style} onChange={e => setStyle(e.target.value)}>
+            <select className="select" value={style} onChange={e => setStyle(e.target.value as any)}>
               {STYLES.map(s => (
                 <option key={s.id} value={s.id}>{s.label}</option>
               ))}
@@ -333,3 +345,4 @@ export function BookScreen() {
     </div>
   );
 }
+export default BookScreen;

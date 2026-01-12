@@ -1,13 +1,29 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import './index.css'
-import App from './App.tsx'
-// import { registerSW } from "virtual:pwa-register";
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
+import "./index.css";
+import App from "./App";
+import { AppProvider } from "./app/AppContext";
+import { registerSW } from "virtual:pwa-register";
+import { ToastProvider } from "./ui/Toast";
+import { PlayerProvider } from "./player/PlayerProvider";
 
-// registerSW({ immediate: true });
+const disablePwa = (import.meta as any).env?.VITE_DISABLE_PWA === "1";
 
-createRoot(document.getElementById('root')!).render(
+if (!disablePwa) {
+  registerSW({ immediate: true });
+}
+
+createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
-  </StrictMode>,
-)
+    <AppProvider>
+      <ToastProvider>
+        <PlayerProvider>
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+        </PlayerProvider>
+      </ToastProvider>
+    </AppProvider>
+  </StrictMode>
+);

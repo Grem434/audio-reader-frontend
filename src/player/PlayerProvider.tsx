@@ -1,339 +1,334 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { getContinue, recapChapter, saveBookmark } from "../apiClient";
-import type { Chapter, ContinuePayload } from "../types";
-import { useApp } from "../app/AppContext";
-import { useToast } from "../ui/Toast";
+import { getContinue, saveBookmark } from "../apiClient";
 
-type PlayerTrack = {
+type ChapterLite = {
+  id: string;
+  index_in_book: number;
+  title: string | null;
+  audio_path: string | null;
+};
+
+type PlayChapterArgs = {
   bookId: string;
   bookTitle: string;
-  chapters: Chapter[];
+  chapters: ChapterLite[];
   index: number;
+  voice: string;
+  style: string; // en backend lo normalizas a learning|narrative, pero aquí puede venir cualquier string
 };
 
 type PlayerState = {
-  track: PlayerTrack | null;
-  src: string | null;
-  nowTitle: string;
-  nowSubtitle: string;
+  bookId: string | null;
+  bookTitle: string | null;
+  chapters: ChapterLite[];
+  index: number; // índice dentro de chapters[]
+  chapterId: string | null;
 
+  voice: string;
+  style: string;
+
+  isPlaying: boolean;
+  rate: number;
+  position: number;
+  duration: number;
+};
+
+type PlayerContextValue = {
+  // estado “plano” para que PlayerScreen lo use fácil
+  hasAudio: boolean;
   playing: boolean;
   position: number;
   duration: number;
   rate: number;
-};
+  nowTitle: string;
+  nowSubtitle: string;
 
-type PlayerCtx = PlayerState & {
-  playChapter: (t: PlayerTrack) => Promise<void>;
-  resumeBook: (bookId: string, bookTitle: string, chapters: Chapter[]) => Promise<boolean>;
+  // acciones
+  playChapter: (args: PlayChapterArgs) => Promise<void>;
+  resumeBook: (bookId: string, bookTitle: string, chapters: ChapterLite[], voice: string, style: string) => Promise<boolean>;
+
   toggle: () => void;
+  play: () => void;
   pause: () => void;
-  seekTo: (seconds: number) => void;
+
+  seekTo: (sec: number) => void;
   seekBy: (delta: number) => void;
+
   next: () => void;
   prev: () => void;
+
   setRate: (r: number) => void;
-  recap: () => Promise<string>;
-  hasAudio: boolean;
+
+  recap: () => Promise<string>; // si no lo usas, devuelve ""
+
+  // helpers para otros sitios (por si algo los usa)
+  setVoice: (v: string) => void;
+  setStyle: (s: string) => void;
 };
 
-const Ctx = createContext<PlayerCtx | null>(null);
+const PlayerContext = createContext<PlayerContextValue | null>(null);
 
-function clamp(n: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, n));
+function clamp(n: number, a: number, b: number) {
+  return Math.max(a, Math.min(b, n));
 }
 
-function chapterLabel(ch: Chapter) {
-  return ch.title || `Capítulo ${ch.index_in_book + 1}`;
+function safeNum(x: any, fallback = 0) {
+  const n = Number(x);
+  return Number.isFinite(n) ? n : fallback;
 }
 
-function resolveAudioSrc(audioPath: string) {
-  // apiClient API_BASE="" => normalmente audio_path será relativo y vale tal cual.
-  // Si en algún momento devuelves una URL absoluta, también funciona.
-  return audioPath;
+// Importante: tu VITE_API_URL suele ser ".../api". Para audios necesitamos el ORIGIN (sin /api)
+function getApiOrigin(): string {
+  const raw = (import.meta as any).env?.VITE_API_URL || "http://localhost:3001";
+  return String(raw).replace(/\/api\/?$/, "");
+}
+
+function audioUrlFromPath(audio_path: string): string {
+  if (!audio_path) return "";
+  if (/^https?:\/\//i.test(audio_path)) return audio_path;
+  return `${getApiOrigin()}${audio_path.startsWith("/") ? "" : "/"}${audio_path}`;
 }
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
-  const { userId, voice, style } = useApp();
-  const { toast } = useToast();
-
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const lastBookmarkAt = useRef<number>(0);
 
-  const [state, setState] = useState<PlayerState>(() => ({
-    track: null,
-    src: null,
-    nowTitle: "",
-    nowSubtitle: "",
-    playing: false,
+  const [s, setS] = useState<PlayerState>({
+    bookId: null,
+    bookTitle: null,
+    chapters: [],
+    index: 0,
+    chapterId: null,
+    voice: "alloy",
+    style: "learning",
+    isPlaying: false,
+    rate: 1,
     position: 0,
     duration: 0,
-    rate: Number(localStorage.getItem("audio_reader_rate") || "1")
-  }));
+  });
 
-  const hasAudio = !!state.src;
+  // throttle bookmarks para no spamear
+  const lastSavedRef = useRef<{ key: string; t: number } | null>(null);
 
-  // Mantener un ref del estado para callbacks
-  const stateRef = useRef(state);
+  // crea el <audio> una sola vez
   useEffect(() => {
-    stateRef.current = state;
-  }, [state]);
-
-  // Crear el <audio> una sola vez
-  useEffect(() => {
-    const el = new Audio();
-    el.preload = "metadata";
-    el.controls = false;
-    (el as any).playsInline = true;
-
-    el.playbackRate = stateRef.current.rate;
-
-    audioRef.current = el;
+    const a = new Audio();
+    a.preload = "metadata";
+    a.crossOrigin = "anonymous";
+    audioRef.current = a;
 
     const onTime = () => {
-      const pos = el.currentTime || 0;
-      const dur = el.duration || 0;
+      const cur = safeNum(a.currentTime, 0);
+      const dur = safeNum(a.duration, 0);
 
-      setState(prev => ({ ...prev, position: pos, duration: dur, playing: !el.paused }));
+      setS((prev) => ({
+        ...prev,
+        position: cur,
+        duration: dur || prev.duration,
+      }));
 
-      const s = stateRef.current;
-      if (!s.track || !s.src) return;
+      // bookmark automático (cada ~1.5s)
+      const { bookId, chapterId, voice, style } = s;
+      if (!bookId || !chapterId) return;
 
-      // bookmark throttled (cada 2s)
+      const key = `${bookId}:${chapterId}:${voice}:${style}`;
       const now = Date.now();
-      if (now - lastBookmarkAt.current < 2000) return;
-      lastBookmarkAt.current = now;
-      void persistBookmark(Math.floor(pos));
+      const last = lastSavedRef.current;
+      if (last && last.key === key && now - last.t < 1500) return;
+      lastSavedRef.current = { key, t: now };
+
+      // no esperamos (fire & forget)
+      void saveBookmark({
+        bookId,
+        chapterId,
+        positionSeconds: cur,
+        voice,
+        style,
+      }).catch(() => {});
     };
 
-    const onPause = () => {
-      setState(prev => ({ ...prev, playing: false }));
-      const s = stateRef.current;
-      if (s.track && s.src) void persistBookmark(Math.floor(el.currentTime || 0));
-    };
-
-    const onPlay = () => setState(prev => ({ ...prev, playing: true }));
-    const onLoaded = () => setState(prev => ({ ...prev, duration: el.duration || 0 }));
+    const onPlay = () => setS((prev) => ({ ...prev, isPlaying: true }));
+    const onPause = () => setS((prev) => ({ ...prev, isPlaying: false }));
     const onEnded = () => {
-      setState(prev => ({ ...prev, playing: false }));
-      next();
+      // cuando termina, pasa al siguiente si existe
+      setS((prev) => {
+        const nextIndex = prev.index + 1;
+        if (nextIndex >= prev.chapters.length) return { ...prev, isPlaying: false };
+        return prev; // el salto real lo hace next()
+      });
     };
 
-    el.addEventListener("timeupdate", onTime);
-    el.addEventListener("pause", onPause);
-    el.addEventListener("play", onPlay);
-    el.addEventListener("loadedmetadata", onLoaded);
-    el.addEventListener("ended", onEnded);
+    a.addEventListener("timeupdate", onTime);
+    a.addEventListener("play", onPlay);
+    a.addEventListener("pause", onPause);
+    a.addEventListener("ended", onEnded);
 
     return () => {
-      el.pause();
-      el.src = "";
-      el.removeEventListener("timeupdate", onTime);
-      el.removeEventListener("pause", onPause);
-      el.removeEventListener("play", onPlay);
-      el.removeEventListener("loadedmetadata", onLoaded);
-      el.removeEventListener("ended", onEnded);
+      a.removeEventListener("timeupdate", onTime);
+      a.removeEventListener("play", onPlay);
+      a.removeEventListener("pause", onPause);
+      a.removeEventListener("ended", onEnded);
+      a.pause();
       audioRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // aplica rate al audio
   useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.playbackRate = state.rate;
-    }
-  }, [state.rate]);
+    const a = audioRef.current;
+    if (!a) return;
+    a.playbackRate = s.rate;
+  }, [s.rate]);
 
-  async function persistBookmark(positionSeconds: number) {
-    const s = stateRef.current;
-    if (!s.track || !audioRef.current) return;
-    const chapter = s.track.chapters[s.track.index];
-    if (!chapter) return;
+  async function loadAndPlayByIndex(chapters: ChapterLite[], idx: number, bookId: string, bookTitle: string, voice: string, style: string) {
+    const a = audioRef.current;
+    if (!a) return;
 
-    try {
-      await saveBookmark({
-        userId,
-        bookId: s.track.bookId,
-        chapterId: chapter.id,
-        positionSeconds
-      });
-    } catch {
-      // silencioso
-    }
-  }
+    const ch = chapters[idx];
+    if (!ch || !ch.audio_path) throw new Error("Ese capítulo no tiene audio.");
 
-  async function playChapter(track: PlayerTrack) {
-    const ch = track.chapters[track.index];
-    if (!ch) return;
+    const url = audioUrlFromPath(ch.audio_path);
 
-    if (!ch.audio_path) {
-      toast("Ese capítulo no tiene audio todavía.");
-      return;
-    }
+    // carga
+    a.pause();
+    a.src = url;
+    a.currentTime = 0;
 
-    const src = resolveAudioSrc(ch.audio_path);
-    const el = audioRef.current;
-    if (!el) return;
-
-    setState(prev => ({
+    setS((prev) => ({
       ...prev,
-      track,
-      src,
-      nowTitle: track.bookTitle || "Libro",
-      nowSubtitle: `${ch.index_in_book + 1}. ${chapterLabel(ch)}`
+      bookId,
+      bookTitle,
+      chapters,
+      index: idx,
+      chapterId: ch.id,
+      voice,
+      style,
+      position: 0,
+      duration: 0,
     }));
 
-    el.pause();
-    el.src = src;
-    el.load();
-
-    try {
-      const cont: ContinuePayload = await getContinue({
-        userId,
-        bookId: track.bookId,
-        voice,
-        style
-      });
-
-      const pos = cont?.bookmark?.position_seconds ?? 0;
-      if (cont?.bookmark?.chapter_id === ch.id) {
-        const target = pos;
-        const onLoaded = () => {
-          try {
-            el.currentTime = target;
-          } catch {}
-          el.removeEventListener("loadedmetadata", onLoaded);
-        };
-        el.addEventListener("loadedmetadata", onLoaded);
-      }
-    } catch {
-      // ignore
-    }
-
-    setTimeout(() => {
-      el.play().catch(() => {});
-    }, 50);
+    // reproduce (si el navegador lo permite; aquí viene de un click normalmente)
+    await a.play();
   }
 
-  async function resumeBook(bookId: string, bookTitle: string, chapters: Chapter[]) {
-    try {
-      const cont: ContinuePayload = await getContinue({ userId, bookId, voice, style });
-      const chapter = cont?.chapter;
+  const api = useMemo<PlayerContextValue>(() => {
+    return {
+      hasAudio: !!(s.chapters[s.index]?.audio_path),
+      playing: s.isPlaying,
+      position: s.position,
+      duration: s.duration,
+      rate: s.rate,
+      nowTitle: s.bookTitle || "Reproductor",
+      nowSubtitle: (() => {
+        const ch = s.chapters[s.index];
+        if (!ch) return "";
+        const n = ch.index_in_book ?? s.index;
+        const t = ch.title || `Capítulo ${n + 1}`;
+        return t;
+      })(),
 
-      if (chapter?.id && chapter.audio_path) {
-        const idx = chapters.findIndex(c => c.id === chapter.id);
-        const pick = idx >= 0 ? idx : Math.max(0, chapter.index_in_book);
-        await playChapter({ bookId, bookTitle, chapters, index: pick });
-        return true;
-      }
+      setVoice: (v) => setS((prev) => ({ ...prev, voice: v })),
+      setStyle: (st) => setS((prev) => ({ ...prev, style: st })),
 
-      const firstReady = chapters.findIndex(c => !!c.audio_path);
-      if (firstReady >= 0) {
-        await playChapter({ bookId, bookTitle, chapters, index: firstReady });
-        return true;
-      }
+      playChapter: async ({ bookId, bookTitle, chapters, index, voice, style }) => {
+        await loadAndPlayByIndex(chapters, index, bookId, bookTitle, voice, style);
+      },
 
-      toast("Este libro todavía no tiene audios generados.");
-      return false;
-    } catch (e: any) {
-      toast(e?.message || "Error en Continuar");
-      return false;
-    }
-  }
+      resumeBook: async (bookId, bookTitle, chapters, voice, style) => {
+        try {
+          const data = await getContinue({ bookId, voice, style });
+          const chapterId = (data?.chapterId ?? data?.chapter_id ?? null) as string | null;
+          const positionSeconds = safeNum(data?.positionSeconds ?? data?.position_seconds ?? 0, 0);
 
-  function toggle() {
-    const el = audioRef.current;
-    if (!el || !stateRef.current.src) return;
-    if (el.paused) el.play().catch(() => {});
-    else el.pause();
-  }
+          let idx = 0;
+          if (chapterId) {
+            const found = chapters.findIndex((c) => c.id === chapterId);
+            if (found >= 0) idx = found;
+          }
 
-  function pause() {
-    const el = audioRef.current;
-    if (!el) return;
-    el.pause();
-  }
+          await loadAndPlayByIndex(chapters, idx, bookId, bookTitle, voice, style);
 
-  function seekTo(seconds: number) {
-    const el = audioRef.current;
-    if (!el) return;
-    const dur = el.duration || stateRef.current.duration || 0;
-    const t = clamp(seconds, 0, Math.max(0, dur || 0));
-    try {
-      el.currentTime = t;
-    } catch {}
-    setState(prev => ({ ...prev, position: t }));
-  }
+          const a = audioRef.current;
+          if (a) {
+            a.currentTime = Math.max(0, positionSeconds);
+          }
+          return true;
+        } catch {
+          return false;
+        }
+      },
 
-  function seekBy(delta: number) {
-    const el = audioRef.current;
-    if (!el) return;
-    seekTo((el.currentTime || 0) + delta);
-  }
+      toggle: () => {
+        const a = audioRef.current;
+        if (!a) return;
+        if (a.paused) void a.play();
+        else a.pause();
+      },
 
-  function next() {
-    const s = stateRef.current;
-    if (!s.track) return;
-    const idx = s.track.index + 1;
-    if (idx >= s.track.chapters.length) {
-      toast("Fin del libro.");
-      return;
-    }
-    void playChapter({ ...s.track, index: idx });
-  }
+      play: () => {
+        const a = audioRef.current;
+        if (!a) return;
+        void a.play();
+      },
 
-  function prev() {
-    const s = stateRef.current;
-    if (!s.track) return;
-    const idx = Math.max(0, s.track.index - 1);
-    void playChapter({ ...s.track, index: idx });
-  }
+      pause: () => {
+        const a = audioRef.current;
+        if (!a) return;
+        a.pause();
+      },
 
-  function setRate(r: number) {
-    const rate = clamp(r, 0.75, 2.0);
-    localStorage.setItem("audio_reader_rate", String(rate));
-    setState(prev => ({ ...prev, rate }));
-  }
+      seekTo: (sec) => {
+        const a = audioRef.current;
+        if (!a) return;
+        a.currentTime = clamp(sec, 0, Number.isFinite(a.duration) ? a.duration : sec);
+        setS((prev) => ({ ...prev, position: a.currentTime }));
+      },
 
-  async function recap() {
-    const s = stateRef.current;
-    const el = audioRef.current;
-    if (!s.track || !el) throw new Error("Nada reproduciéndose");
-    const chapter = s.track.chapters[s.track.index];
-    if (!chapter) throw new Error("Capítulo no encontrado");
+      seekBy: (delta) => {
+        const a = audioRef.current;
+        if (!a) return;
+        const next = (safeNum(a.currentTime, 0) || 0) + delta;
+        a.currentTime = clamp(next, 0, Number.isFinite(a.duration) ? a.duration : next);
+        setS((prev) => ({ ...prev, position: a.currentTime }));
+      },
 
-    const positionSeconds = Math.floor(el.currentTime || 0);
-    const res = await recapChapter({
-      userId,
-      bookId: s.track.bookId,
-      chapterId: chapter.id,
-      positionSeconds
-    });
-    return res.text || "";
-  }
+      next: async () => {
+        const { chapters, index, bookId, bookTitle, voice, style } = s;
+        if (!bookId || !bookTitle) return;
+        const nextIndex = index + 1;
+        if (nextIndex >= chapters.length) return;
+        try {
+          await loadAndPlayByIndex(chapters, nextIndex, bookId, bookTitle, voice, style);
+        } catch {
+          // si el siguiente no tiene audio, paramos
+        }
+      },
 
-  const value: PlayerCtx = useMemo(
-    () => ({
-      ...state,
-      playChapter,
-      resumeBook,
-      toggle,
-      pause,
-      seekTo,
-      seekBy,
-      next,
-      prev,
-      setRate,
-      recap,
-      hasAudio
-    }),
-    [state]
-  );
+      prev: async () => {
+        const { chapters, index, bookId, bookTitle, voice, style } = s;
+        if (!bookId || !bookTitle) return;
+        const prevIndex = index - 1;
+        if (prevIndex < 0) return;
+        try {
+          await loadAndPlayByIndex(chapters, prevIndex, bookId, bookTitle, voice, style);
+        } catch {}
+      },
 
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+      setRate: (r) => setS((prev) => ({ ...prev, rate: clamp(r, 0.5, 3) })),
+
+      recap: async () => {
+        // Si tienes endpoint de resumen, aquí. De momento, no rompas el botón.
+        return "";
+      },
+    };
+    // OJO: dependemos de s entero, es simple y seguro aquí
+  }, [s]);
+
+  return <PlayerContext.Provider value={api}>{children}</PlayerContext.Provider>;
 }
 
 export function usePlayer() {
-  const ctx = useContext(Ctx);
+  const ctx = useContext(PlayerContext);
   if (!ctx) throw new Error("usePlayer must be used inside <PlayerProvider/>");
   return ctx;
 }

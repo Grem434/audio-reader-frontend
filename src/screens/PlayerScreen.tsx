@@ -11,6 +11,17 @@ function fmt(sec: number) {
   return `${m}:${String(r).padStart(2, "0")}`;
 }
 
+function resolveAudioUrl(audioPath: string) {
+  const base =
+    (import.meta as any).env?.VITE_BACKEND_URL ||
+    (import.meta as any).env?.VITE_API_URL ||
+    "https://audio-reader-backend-production.up.railway.app";
+  const b = String(base).replace(/\/+$/, "");
+  if (!audioPath) return "";
+  if (audioPath.startsWith("http://") || audioPath.startsWith("https://")) return audioPath;
+  return `${b}${audioPath.startsWith("/") ? "" : "/"}${audioPath}`;
+}
+
 export function PlayerScreen() {
   const nav = useNavigate();
   const { toast } = useToast();
@@ -24,6 +35,8 @@ export function PlayerScreen() {
   }, [p.position, p.duration]);
 
   const canPlay = p.hasAudio;
+
+  const audioSrc = resolveAudioUrl(((p as any).state?.chapters?.[(p as any).state?.index ?? 0]?.audio_path) || "");
 
   async function onRecap() {
     try {
@@ -109,6 +122,14 @@ export function PlayerScreen() {
             </div>
           </div>
         </div>
+        
+<audio
+  controls
+  preload="auto"
+  style={{ width: "100%", marginTop: 20 }}
+  src="https://audio-reader-backend-production.up.railway.app/audio/8be2f3df-ecf2-44e6-85ba-a8538a9baee8/alloy/learning/chapter-0.mp3"
+/>
+
 
         {/* Slider */}
         <div style={{ marginTop: 16 }}>
