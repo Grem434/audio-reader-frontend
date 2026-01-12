@@ -100,30 +100,56 @@ export function BookScreen() {
     }
   }
 
-  async function genMissing() {
+  async function genNextChapter() {
     setBusy(true);
     try {
-      // Por simplicidad, "Generar faltantes" regenerará todo el libro en segundo plano
-      // o podríamos iterar. Para MVP: generamos todo (backend debe manejarlo).
-      // O podemos llamar a generateMissing del backend si hiciera algo, pero solo devuelve lista.
-      // Así que llamamos a generateAudio sin rango = todo el libro.
-      // toast("Solicitando generación completa (puede tardar)..."); // <-- Ruido visual
+      // 1. Buscar el primer capítulo sin audio
+      const firstMissing = chapters.find(c => !c.audio_path);
+
+      if (!firstMissing) {
+        toast("¡El libro ya tiene audio completo!");
+        setBusy(false);
+        return;
+      }
+
+      // 2. Generar solo ese
+      await generateAudioRange({
+        userId,
+        bookId,
+        startIndex: firstMissing.index_in_book, // 1 solo capítulo
+        endIndex: firstMissing.index_in_book,
+        voice,
+        style
+      });
+
+      toast(`Generado Cap. ${firstMissing.index_in_book + 1}`);
+      await refresh();
+    } catch (e: any) {
+      toast(e?.message || "Error generando capítulo");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Mantenemos genMissing como "opción nuclear" (Generate All) pero oculta o secundaria
+  async function genAll() {
+    if (!confirm("⚠️ ¿Seguro que quieres generar TODO el libro?\n\nEsto consumirá muchos créditos.")) return;
+
+    setBusy(true);
+    try {
       const res: any = await generateAudioRange({
         userId,
         bookId,
         voice,
         style
       });
-
       if (res && res.generatedChapters === 0) {
-        alert(`Ojo: El backend dice que ha generado 0 capítulos. \nMsg: ${res.message}\nError: ${JSON.stringify(res.error || res.details || "")}`);
+        alert(`Backend reporta 0 generados. Msg: ${res.message}`);
       }
-
-      // toast("Proceso iniciado."); // <-- Ya tenemos el loading overlay
       await refresh();
-      toast("Generación completada / actualizada.");
+      toast("Generación completa finalizada.");
     } catch (e: any) {
-      toast(e?.message || "Error generando faltantes");
+      toast(e?.message || "Error generando todo");
     } finally {
       setBusy(false);
     }
@@ -302,14 +328,25 @@ export function BookScreen() {
             <button
               className="btn btnPrimary"
               style={{ width: "100%", justifyContent: "center", fontSize: 16 }}
-              onClick={() => { setSheetOpen(false); void genMissing(); }}
-              disabled={busy}
+              onClick={() => { setSheetOpen(false); void genNextChapter(); }}
+              disabled={busy || readyCount === chapters.length}
             >
-              ✨ Generar Audio del Libro
+              ⚡ Generar Siguiente Capítulo
             </button>
             <div className="small muted" style={{ marginTop: 8, textAlign: "center" }}>
-              Generará todo lo que falte con el narrador seleccionado.
+              Genera solo el siguiente capítulo faltante para ahorrar costes.
             </div>
+
+            <div style={{ height: 16 }} />
+
+            <button
+              className="btn"
+              style={{ width: "100%", justifyContent: "center", fontSize: 14, opacity: 0.8 }}
+              onClick={() => { setSheetOpen(false); void genAll(); }}
+              disabled={busy}
+            >
+              ⚠️ Generar Libro Completo
+            </button>
           </div>
 
           <div style={{ marginTop: 10 }}>

@@ -145,10 +145,24 @@ export function PlayerScreen() {
         {/* Controls */}
         <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginTop: 18 }}>
           <button className="btn" disabled={!canPlay} onClick={p.prev} title="Anterior">⏮</button>
-          <button className="btn" disabled={!canPlay} onClick={() => p.seekBy(-10)} title="-10s">↺ 10</button>
-          <button className="btn btnPrimary" disabled={!canPlay} onClick={p.toggle} title="Play/Pause" style={{ flex: 1 }}>
-            {p.playing ? "⏸ Pausa" : "▶ Reproducir"}
+
+          <button
+            className="btn"
+            style={{ minWidth: 48, fontWeight: 700, fontSize: 13 }}
+            onClick={() => {
+              const speeds = [1, 1.25, 1.5, 2];
+              const idx = speeds.indexOf(p.rate);
+              const next = speeds[(idx + 1) % speeds.length];
+              p.setRate(next);
+            }}
+          >
+            {p.rate}x
           </button>
+
+          <button className="btn btnPrimary" disabled={!canPlay} onClick={p.toggle} title="Play/Pause" style={{ flex: 1 }}>
+            {p.playing ? "⏸" : "▶"}
+          </button>
+
           <button className="btn" disabled={!canPlay} onClick={() => p.seekBy(10)} title="+10s">10 ↻</button>
           <button className="btn" disabled={!canPlay} onClick={p.next} title="Siguiente">⏭</button>
         </div>
@@ -207,6 +221,6 @@ export function PlayerScreen() {
           </div>
         </div>
       </BottomSheet>
-    </div>
+    </div >
   );
 }
