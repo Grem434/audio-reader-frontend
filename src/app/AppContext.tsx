@@ -120,7 +120,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<AppCtx>(
     () => ({
-      userId: userId || "pending",
+      userId: userId,
       voice,
       style,
       setVoice,
