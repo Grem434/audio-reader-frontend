@@ -7,6 +7,14 @@ import { useToast } from "../ui/Toast";
 import { usePlayer } from "../player/PlayerProvider";
 import { BottomSheet } from "../ui/BottomSheet";
 
+// Simple spin animation style
+const spinStyle = document.createElement("style");
+spinStyle.innerHTML = `
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.spin { animation: spin 1.5s linear infinite; display: inline-block; }
+`;
+document.head.appendChild(spinStyle);
+
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
@@ -132,15 +140,16 @@ export function BookScreen() {
       // o podríamos iterar. Para MVP: generamos todo (backend debe manejarlo).
       // O podemos llamar a generateMissing del backend si hiciera algo, pero solo devuelve lista.
       // Así que llamamos a generateAudio sin rango = todo el libro.
-      toast("Solicitando generación completa (puede tardar)...");
+      // toast("Solicitando generación completa (puede tardar)..."); // <-- Ruido visual
       await generateAudioRange({
         userId,
         bookId,
         voice,
         style
       });
-      toast("Proceso iniciado.");
+      // toast("Proceso iniciado."); // <-- Ya tenemos el loading overlay
       await refresh(false);
+      toast("Generación completada / actualizada.");
     } catch (e: any) {
       toast(e?.message || "Error generando faltantes");
     } finally {
@@ -177,8 +186,26 @@ export function BookScreen() {
     }
   }
 
+  // --- Loading Overlay ---
+  const LoadingOverlay = () => (
+    <div style={{
+      position: "fixed", inset: 0,
+      background: "rgba(0,0,0,0.6)",
+      backdropFilter: "blur(4px)",
+      display: "grid", placeItems: "center",
+      zIndex: 9999
+    }}>
+      <div className="card" style={{ padding: 24, textAlign: "center", minWidth: 200 }}>
+        <div style={{ fontSize: 24, marginBottom: 12 }} className="spin">⏳</div>
+        <div>Generando audio...</div>
+        <div className="small muted" style={{ marginTop: 8 }}>Esto puede tardar unos segundos</div>
+      </div>
+    </div>
+  );
+
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+      {busy && <LoadingOverlay />}
       <div
         style={{
           position: "sticky",
