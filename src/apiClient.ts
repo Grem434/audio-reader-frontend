@@ -5,7 +5,7 @@ const API_BASE =
   (import.meta as any).env?.VITE_BACKEND_URL?.replace(/\/+$/, "") ||
   "https://audio-reader-backend-production.up.railway.app";
 
-export const DEFAULT_VOICE = "alloy";
+export const DEFAULT_VOICE = "onyx";
 export const DEFAULT_STYLE = "learning";
 
 type FetchOpts = {
