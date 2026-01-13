@@ -114,12 +114,7 @@ export function PlayerScreen() {
           </div>
         </div>
 
-        <audio
-          controls
-          preload="auto"
-          style={{ width: "100%", marginTop: 20 }}
-          src="https://audio-reader-backend-production.up.railway.app/audio/8be2f3df-ecf2-44e6-85ba-a8538a9baee8/alloy/learning/chapter-0.mp3"
-        />
+
 
 
         {/* Slider */}

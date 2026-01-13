@@ -18,6 +18,9 @@ type FetchOpts = {
 async function apiFetch<T>({ method = "GET", path, userId, body }: FetchOpts): Promise<T> {
   const headers: Record<string, string> = {
     Accept: "application/json",
+    "Cache-Control": "no-cache, no-store, must-revalidate",
+    Pragma: "no-cache",
+    Expires: "0",
   };
 
   // Solo ponemos x-user-id si tenemos userId (para bookmarks/progreso/audios por usuario).
@@ -25,7 +28,11 @@ async function apiFetch<T>({ method = "GET", path, userId, body }: FetchOpts): P
 
   if (body !== undefined) headers["Content-Type"] = "application/json";
 
-  const res = await fetch(`${API_BASE}${path}`, {
+  // Prevent URL caching with timestamp
+  const url = new URL(`${API_BASE}${path}`);
+  url.searchParams.append("_t", Date.now().toString());
+
+  const res = await fetch(url.toString(), {
     method,
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,

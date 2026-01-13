@@ -70,8 +70,16 @@ export function BookScreen() {
     }
 
     // IMPORTANTÍSIMO: esto es lo que carga el audio (pone src) y deja listo el player
-    await player.playChapter({ bookId, bookTitle, chapters, index, voice, style });
-    nav("/player");
+    setBusy(true);
+    try {
+      await player.playChapter({ bookId, bookTitle, chapters, index, voice, style });
+      nav("/player");
+    } catch (e: any) {
+      console.error(e);
+      toast("Error al reproducir: " + (e?.message || "Posible error de red o audio no encontrado"));
+    } finally {
+      setBusy(false);
+    }
   }
 
 
