@@ -9,13 +9,12 @@ const LS_STYLE = "audio-reader-style";
 
 /** 👇 Estos exports SON los que tu BookScreen está importando */
 export const VOICES = [
-  { id: "onyx", label: "Masculina (Onyx)" },
-  { id: "nova", label: "Femenina (Nova)" },
+  { id: "echo", label: "Masculina (Echo)" },
+  { id: "shimmer", label: "Femenina (Shimmer)" },
 ] as const;
 
-export const STYLES = [
-  { id: "learning", label: "Aprendizaje" }
-] as const;
+// Styles removed as they were causing TTS instruction leaks
+export const STYLES = [] as const;
 
 type VoiceId = typeof VOICES[number]["id"];
 type StyleId = typeof STYLES[number]["id"];
@@ -41,9 +40,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [voice, setVoiceState] = useState<VoiceId>(() => {
     const saved = localStorage.getItem(LS_VOICE) as VoiceId | null;
     // Validate that the saved voice still exists
-    if (saved && VOICES.some(v => v.id === saved)) {
-      return saved;
-    }
     return VOICES[0].id;
   });
   const [style, setStyleState] = useState<StyleId>(() => {
