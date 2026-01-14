@@ -137,30 +137,54 @@ export function PlayerScreen() {
           </div>
         </div>
 
-        {/* Controls */}
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginTop: 18 }}>
-          <button className="btn" disabled={!canPlay} onClick={p.prev} title="Anterior">⏮</button>
+        {/* Controls: Two Rows for better spacing */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 24, marginTop: 24 }}>
 
-          <button
-            className="btn"
-            style={{ minWidth: 48, fontWeight: 700, fontSize: 13 }}
-            onClick={() => {
-              const speeds = [1, 1.25, 1.5, 2];
-              const idx = speeds.indexOf(p.rate);
-              const next = speeds[(idx + 1) % speeds.length];
-              p.setRate(next);
-            }}
-          >
-            {p.rate}x
-          </button>
+          {/* Secondary Controls: Seek & Speed */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 20px" }}>
+            <button className="btn" disabled={!canPlay} onClick={() => p.seekBy(-10)} title="-10s" style={{ width: 60 }}>
+              ↺ 10
+            </button>
 
-          <button className="btn btnPrimary" disabled={!canPlay} onClick={p.toggle} title="Play/Pause" style={{ flex: 1 }}>
-            {p.playing ? "⏸" : "▶"}
-          </button>
+            <button
+              className="btn"
+              style={{ fontWeight: 700, fontSize: 13, padding: "8px 16px", height: 36, minHeight: 0 }}
+              onClick={() => {
+                const speeds = [1, 1.25, 1.5, 2];
+                const idx = speeds.indexOf(p.rate);
+                const next = speeds[(idx + 1) % speeds.length];
+                p.setRate(next);
+              }}
+            >
+              {p.rate}x
+            </button>
 
-          <button className="btn" disabled={!canPlay} onClick={() => p.seekBy(-10)} title="-10s">↺ 10</button>
-          <button className="btn" disabled={!canPlay} onClick={() => p.seekBy(10)} title="+10s">10 ↻</button>
-          <button className="btn" disabled={!canPlay} onClick={p.next} title="Siguiente">⏭</button>
+            <button className="btn" disabled={!canPlay} onClick={() => p.seekBy(10)} title="+10s" style={{ width: 60 }}>
+              10 ↻
+            </button>
+          </div>
+
+          {/* Primary Controls: Transport */}
+          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 30 }}>
+            <button className="btn" disabled={!canPlay} onClick={p.prev} title="Anterior" style={{ width: 56, height: 56, borderRadius: "50%", fontSize: 24 }}>
+              ⏮
+            </button>
+
+            <button
+              className="btn btnPrimary"
+              disabled={!canPlay}
+              onClick={p.toggle}
+              title="Play/Pause"
+              style={{ width: 80, height: 80, borderRadius: "50%", fontSize: 32, boxShadow: "0 10px 40px rgba(59, 130, 246, 0.4)" }}
+            >
+              {p.playing ? "⏸" : "▶"}
+            </button>
+
+            <button className="btn" disabled={!canPlay} onClick={p.next} title="Siguiente" style={{ width: 56, height: 56, borderRadius: "50%", fontSize: 24 }}>
+              ⏭
+            </button>
+          </div>
+
         </div>
 
         <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
