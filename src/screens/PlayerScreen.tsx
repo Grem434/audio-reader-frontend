@@ -93,7 +93,7 @@ export function PlayerScreen() {
       </div>
 
       {/* Body */}
-      <div style={{ flex: 1, minHeight: 0, overflow: "auto", padding: 16, paddingBottom: 24 }}>
+      <div style={{ flex: 1, minHeight: 0, overflow: "auto", padding: 16, paddingBottom: "calc(24px + env(safe-area-inset-bottom))" }}>
         <div
           className="card"
           style={{

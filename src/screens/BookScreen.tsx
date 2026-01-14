@@ -211,7 +211,7 @@ export function BookScreen() {
         </div>
       </div>
 
-      <div style={{ flex: 1, minHeight: 0, overflow: "auto", padding: 14, paddingBottom: 110 }}>
+      <div style={{ flex: 1, minHeight: 0, overflow: "auto", padding: 14, paddingBottom: "calc(110px + env(safe-area-inset-bottom))" }}>
         {loading ? (
           <div className="muted">Cargando...</div>
         ) : err ? (

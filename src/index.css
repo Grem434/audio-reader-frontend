@@ -32,6 +32,8 @@ body {
   background-image: var(--bg-gradient);
   color: var(--text-main);
   height: 100vh;
+  min-height: 100dvh;
+  /* Dynamic Viewport Height for mobile */
   overflow: hidden;
   /* Smoother fonts */
   -webkit-font-smoothing: antialiased;
