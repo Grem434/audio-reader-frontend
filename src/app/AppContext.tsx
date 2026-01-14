@@ -13,8 +13,10 @@ export const VOICES = [
   { id: "shimmer", label: "Femenina (Shimmer)" },
 ] as const;
 
-// Styles removed as they were causing TTS instruction leaks
-export const STYLES = [] as const;
+// Styles "restored" but hidden from UI to satisfy types
+export const STYLES = [
+  { id: "learning", label: "Aprendizaje" }
+] as const;
 
 type VoiceId = typeof VOICES[number]["id"];
 type StyleId = typeof STYLES[number]["id"];
@@ -37,14 +39,19 @@ const Ctx = createContext<AppCtx | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [userId, setUserId] = useState<string>("");
-  const [voice, setVoiceState] = useState<VoiceId>(() => {
-    const saved = localStorage.getItem(LS_VOICE) as VoiceId | null;
-    // Validate that the saved voice still exists
-    return VOICES[0].id;
-  });
+  // We ignore saved voice if it's not valid, or just default to first one
+  const saved = localStorage.getItem(LS_VOICE) as VoiceId | null;
+  if (saved && VOICES.some(v => v.id === saved)) {
+    return saved;
+  }
+  return VOICES[0].id;
   const [style, setStyleState] = useState<StyleId>(() => {
     const saved = localStorage.getItem(LS_STYLE) as StyleId | null;
-    return saved || STYLES[0].id;
+    // Check if saved is valid (e.g. if we changed available styles)
+    if (saved && STYLES.some(s => s.id === saved)) {
+      return saved;
+    }
+    return STYLES[0].id;
   });
 
   const [authLoading, setAuthLoading] = useState(false);
