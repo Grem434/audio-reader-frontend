@@ -158,6 +158,7 @@ export function PlayerScreen() {
             {p.playing ? "⏸" : "▶"}
           </button>
 
+          <button className="btn" disabled={!canPlay} onClick={() => p.seekBy(-10)} title="-10s">↺ 10</button>
           <button className="btn" disabled={!canPlay} onClick={() => p.seekBy(10)} title="+10s">10 ↻</button>
           <button className="btn" disabled={!canPlay} onClick={p.next} title="Siguiente">⏭</button>
         </div>

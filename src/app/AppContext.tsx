@@ -39,12 +39,9 @@ const Ctx = createContext<AppCtx | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [userId, setUserId] = useState<string>("");
-  // We ignore saved voice if it's not valid, or just default to first one
-  const saved = localStorage.getItem(LS_VOICE) as VoiceId | null;
-  if (saved && VOICES.some(v => v.id === saved)) {
-    return saved;
-  }
-  return VOICES[0].id;
+  // Force default voice to avoid build error and ensure consistency
+  const [voice, setVoiceState] = useState<VoiceId>(VOICES[0].id);
+
   const [style, setStyleState] = useState<StyleId>(() => {
     const saved = localStorage.getItem(LS_STYLE) as StyleId | null;
     // Check if saved is valid (e.g. if we changed available styles)
