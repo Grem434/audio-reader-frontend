@@ -431,8 +431,25 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setRate: (r) => setS((prev) => ({ ...prev, rate: clamp(r, 0.5, 3) })),
 
       recap: async () => {
-        // Si tienes endpoint de resumen, aquí. De momento, no rompas el botón.
-        return "";
+        const { bookId, chapterId, position, style, userId } = s as any; // userId might be missing in 's', check AppContext or pass it?
+        // Wait, 's' (PlayerState) doesn't have userId. We need it from somewhere. 
+        // We can ignore it if apiClient handles it via global auth or if we pass nothing (but backend needs it).
+        // Actually, PlayerProvider doesn't readily know 'userId' unless we pass it or store it in 's'.
+        // Quick fix: assume apiClient might have a way or just pass null and hope backend handles it via session (it doesn't, it demands header).
+        // Best approach: Add userId to PlayerState or useContext.
+        // HACK: We can read localStorage directly here to avoid large refactors, matching AppContext logic.
+        const storedUserId = localStorage.getItem("audio-reader-userid");
+
+        if (!bookId || !chapterId) throw new Error("No hay capítulo activo");
+
+        const res = await import("../apiClient").then(m => m.recapChapter({
+          userId: storedUserId,
+          bookId,
+          chapterId,
+          positionSeconds: position,
+          style
+        }));
+        return res.summary;
       },
     };
     // OJO: dependemos de s entero, es simple y seguro aquí

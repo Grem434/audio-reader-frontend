@@ -195,6 +195,26 @@ export async function saveBookmark(args: {
   });
 }
 
+
+export async function recapChapter(args: {
+  userId?: string | null;
+  bookId: string;
+  chapterId: string;
+  positionSeconds: number;
+  style?: string;
+}) {
+  return apiFetch<{ summary: string }>({
+    method: "POST",
+    path: `/api/books/${args.bookId}/recap`,
+    userId: args.userId ?? null,
+    body: {
+      chapterId: args.chapterId,
+      positionSeconds: args.positionSeconds,
+      style: args.style || DEFAULT_STYLE,
+    },
+  });
+}
+
 // ---------- AUDIO DELETION ----------
 
 export async function deleteAudios(args: {
