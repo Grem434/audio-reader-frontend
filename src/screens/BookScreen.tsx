@@ -90,226 +90,227 @@ export function BookScreen() {
     }
   }
 
-  // Modificación robusta: intentar 'resume', si falla (false), reproducir el primero que tenga audio.
-  const ok = await player.resumeBook(bookId, bookTitle, chapters, genVoice, "learning");
-  if (ok) {
-    nav("/player");
-    return;
-  }
-
-  // Fallback: reproducir el primero con audio
-  const firstReadyIndex = chapters.findIndex(c => !!c.audio_path);
-  if (firstReadyIndex >= 0) {
-    // Usamos playIndex que ya maneja busy/nav
-    await playIndex(firstReadyIndex);
-  } else {
-    toast("No hay audios disponibles para continuar.");
-  }
-}
-
-
-
-async function genNextChapter() {
-  setBusyMessage("Generando audio...");
-  setBusy(true);
-  try {
-    const firstMissing = chapters.find(c => !c.audio_path);
-    if (!firstMissing) {
-      toast("¡El libro ya tiene audio completo!");
-      setBusy(false);
+  async function onContinue() {
+    // Modificación robusta: intentar 'resume', si falla (false), reproducir el primero que tenga audio.
+    const ok = await player.resumeBook(bookId, bookTitle, chapters, genVoice, "learning");
+    if (ok) {
+      nav("/player");
       return;
     }
 
-    await generateAudioRange({
-      userId,
-      bookId,
-      startIndex: firstMissing.index_in_book,
-      endIndex: firstMissing.index_in_book,
-      voice: genVoice,
-      style: "learning"
-    });
-
-    toast(`Generado Cap. ${firstMissing.index_in_book + 1} (${genVoice})`);
-    await refresh();
-  } catch (e: any) {
-    toast(e?.message || "Error generando capítulo");
-  } finally {
-    setBusy(false);
+    // Fallback: reproducir el primero con audio
+    const firstReadyIndex = chapters.findIndex(c => !!c.audio_path);
+    if (firstReadyIndex >= 0) {
+      // Usamos playIndex que ya maneja busy/nav
+      await playIndex(firstReadyIndex);
+    } else {
+      toast("No hay audios disponibles para continuar.");
+    }
   }
-}
 
-async function onDeleteAudios() {
-  if (!confirm("¿Borrar TODOS los audios del libro?")) return;
-  setBusyMessage("Borrando...");
-  setBusy(true);
-  try {
-    await deleteAudios({ userId, bookId, voice: "", style: "" });
-    toast("Audios eliminados.");
-    await refresh();
-  } catch (e: any) {
-    toast(e?.message || "Error borrando audios");
-  } finally {
-    setBusy(false);
+
+
+  async function genNextChapter() {
+    setBusyMessage("Generando audio...");
+    setBusy(true);
+    try {
+      const firstMissing = chapters.find(c => !c.audio_path);
+      if (!firstMissing) {
+        toast("¡El libro ya tiene audio completo!");
+        setBusy(false);
+        return;
+      }
+
+      await generateAudioRange({
+        userId,
+        bookId,
+        startIndex: firstMissing.index_in_book,
+        endIndex: firstMissing.index_in_book,
+        voice: genVoice,
+        style: "learning"
+      });
+
+      toast(`Generado Cap. ${firstMissing.index_in_book + 1} (${genVoice})`);
+      await refresh();
+    } catch (e: any) {
+      toast(e?.message || "Error generando capítulo");
+    } finally {
+      setBusy(false);
+    }
   }
-}
 
-const LoadingOverlay = () => (
-  <div style={{
-    position: "fixed", inset: 0,
-    background: "rgba(0,0,0,0.6)",
-    backdropFilter: "blur(4px)",
-    display: "grid", placeItems: "center",
-    zIndex: 9999
-  }}>
-    <div className="card" style={{ padding: 24, textAlign: "center", minWidth: 200 }}>
-      <div style={{ fontSize: 24, marginBottom: 12 }} className="spin">⏳</div>
-      <div>{busyMessage}</div>
-      <div className="small muted" style={{ marginTop: 8 }}>Esto puede tardar unos segundos</div>
-    </div>
-  </div>
-);
+  async function onDeleteAudios() {
+    if (!confirm("¿Borrar TODOS los audios del libro?")) return;
+    setBusyMessage("Borrando...");
+    setBusy(true);
+    try {
+      await deleteAudios({ userId, bookId, voice: "", style: "" });
+      toast("Audios eliminados.");
+      await refresh();
+    } catch (e: any) {
+      toast(e?.message || "Error borrando audios");
+    } finally {
+      setBusy(false);
+    }
+  }
 
-return (
-  <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-    {busy && <LoadingOverlay />}
-    <div
-      style={{
-        position: "sticky",
-        top: 0,
-        zIndex: 10,
-        padding: "12px 14px",
-        paddingTop: "calc(12px + env(safe-area-inset-top))",
-        background: "rgba(10,12,16,0.86)",
-        backdropFilter: "blur(10px)",
-        borderBottom: "1px solid rgba(255,255,255,0.08)"
-      }}
-    >
-      <div className="row" style={{ justifyContent: "space-between" }}>
-        <button className="btn" onClick={() => nav("/library")}>← Biblioteca</button>
-        <button className="btn" onClick={() => setSheetOpen(true)}>⚙️ Opciones</button>
-      </div>
-
-      <div style={{ marginTop: 10 }}>
-        <div style={{ fontWeight: 950, fontSize: 17, lineHeight: 1.1 }}>{bookTitle || "Libro"}</div>
-        <div className="small muted" style={{ marginTop: 4 }}>
-          {readyCount}/{chapters.length} con audio
-        </div>
-
-        <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-          {readyCount > 0 && (
-            <button className="btn btnPrimary" onClick={() => void onContinue()} disabled={loading}>
-              Continuar
-            </button>
-          )}
-          {readyCount === 0 && (
-            <button className="btn btnPrimary" onClick={() => setSheetOpen(true)} disabled={loading}>
-              Generar Audio
-            </button>
-          )}
-        </div>
+  const LoadingOverlay = () => (
+    <div style={{
+      position: "fixed", inset: 0,
+      background: "rgba(0,0,0,0.6)",
+      backdropFilter: "blur(4px)",
+      display: "grid", placeItems: "center",
+      zIndex: 9999
+    }}>
+      <div className="card" style={{ padding: 24, textAlign: "center", minWidth: 200 }}>
+        <div style={{ fontSize: 24, marginBottom: 12 }} className="spin">⏳</div>
+        <div>{busyMessage}</div>
+        <div className="small muted" style={{ marginTop: 8 }}>Esto puede tardar unos segundos</div>
       </div>
     </div>
+  );
 
-    <div style={{ flex: 1, minHeight: 0, overflow: "auto", padding: 14, paddingBottom: 110 }}>
-      {loading ? (
-        <div className="muted">Cargando...</div>
-      ) : err ? (
-        <div style={{ color: "rgba(255,120,120,0.95)", fontWeight: 800 }}>{err}</div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {chapters.map((ch, idx) => {
-            const isReady = !!ch.audio_path;
-            const label = ch.title || `Capítulo ${ch.index_in_book + 1}`;
-            const voiceLabel = ch.voice ? (ch.voice === "onyx" ? "Masculina" : "Femenina") : "";
+  return (
+    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+      {busy && <LoadingOverlay />}
+      <div
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 10,
+          padding: "12px 14px",
+          paddingTop: "calc(12px + env(safe-area-inset-top))",
+          background: "rgba(10,12,16,0.86)",
+          backdropFilter: "blur(10px)",
+          borderBottom: "1px solid rgba(255,255,255,0.08)"
+        }}
+      >
+        <div className="row" style={{ justifyContent: "space-between" }}>
+          <button className="btn" onClick={() => nav("/library")}>← Biblioteca</button>
+          <button className="btn" onClick={() => setSheetOpen(true)}>⚙️ Opciones</button>
+        </div>
 
-            return (
-              <div key={ch.id} className="card">
-                <div
-                  style={{
-                    width: "100%",
-                    textAlign: "left",
-                    border: "none",
-                    background: "transparent",
-                    color: "inherit",
-                    padding: 14,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10
-                  }}
-                  onClick={() => {
-                    if (isReady) void playIndex(idx);
-                    else setSheetOpen(true); // Offer to generate if clicked
-                  }}
-                >
-                  <div style={{ fontWeight: 950, fontSize: 14, minWidth: 42 }}>{ch.index_in_book + 1}.</div>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontWeight: 950, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {label}
+        <div style={{ marginTop: 10 }}>
+          <div style={{ fontWeight: 950, fontSize: 17, lineHeight: 1.1 }}>{bookTitle || "Libro"}</div>
+          <div className="small muted" style={{ marginTop: 4 }}>
+            {readyCount}/{chapters.length} con audio
+          </div>
+
+          <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+            {readyCount > 0 && (
+              <button className="btn btnPrimary" onClick={() => void onContinue()} disabled={loading}>
+                Continuar
+              </button>
+            )}
+            {readyCount === 0 && (
+              <button className="btn btnPrimary" onClick={() => setSheetOpen(true)} disabled={loading}>
+                Generar Audio
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ flex: 1, minHeight: 0, overflow: "auto", padding: 14, paddingBottom: 110 }}>
+        {loading ? (
+          <div className="muted">Cargando...</div>
+        ) : err ? (
+          <div style={{ color: "rgba(255,120,120,0.95)", fontWeight: 800 }}>{err}</div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {chapters.map((ch, idx) => {
+              const isReady = !!ch.audio_path;
+              const label = ch.title || `Capítulo ${ch.index_in_book + 1}`;
+              const voiceLabel = ch.voice ? (ch.voice === "onyx" ? "Masculina" : "Femenina") : "";
+
+              return (
+                <div key={ch.id} className="card">
+                  <div
+                    style={{
+                      width: "100%",
+                      textAlign: "left",
+                      border: "none",
+                      background: "transparent",
+                      color: "inherit",
+                      padding: 14,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10
+                    }}
+                    onClick={() => {
+                      if (isReady) void playIndex(idx);
+                      else setSheetOpen(true); // Offer to generate if clicked
+                    }}
+                  >
+                    <div style={{ fontWeight: 950, fontSize: 14, minWidth: 42 }}>{ch.index_in_book + 1}.</div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontWeight: 950, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {label}
+                      </div>
+                      <div className="small muted">
+                        {isReady ? `🎧 Listo (${voiceLabel})` : "— Sin audio"}
+                      </div>
                     </div>
-                    <div className="small muted">
-                      {isReady ? `🎧 Listo (${voiceLabel})` : "— Sin audio"}
-                    </div>
+                    <div style={{ fontSize: 18 }}>{isReady ? "▶" : "⚡"}</div>
                   </div>
-                  <div style={{ fontSize: 18 }}>{isReady ? "▶" : "⚡"}</div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-
-    <BottomSheet open={sheetOpen} title="Gestión de Audio" onClose={() => setSheetOpen(false)}>
-      <div style={{ display: "grid", gap: 20 }}>
-
-        <div>
-          <div className="small muted" style={{ fontWeight: 600, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Voz para generar</div>
-          <div style={{ position: "relative" }}>
-            <select className="select" value={genVoice} onChange={e => {
-              const v = e.target.value as any;
-              setGenVoice(v);
-              setVoice(v); // Update global pref too
-            }}>
-              {VOICES.map(v => (
-                <option key={v.id} value={v.id}>{v.label}</option>
-              ))}
-            </select>
-            <div style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>⌄</div>
+              );
+            })}
           </div>
-          <div className="small muted" style={{ marginTop: 6, lineHeight: 1.4 }}>
-            Si generas un capítulo que ya existe, se sustituirá con esta nueva voz.
-          </div>
-        </div>
-
-        <div className="divider" />
-
-        <div>
-          <button
-            className="btn btnPrimary"
-            style={{ width: "100%", justifyContent: "center", fontSize: 16 }}
-            onClick={() => { setSheetOpen(false); void genNextChapter(); }}
-            disabled={busy || readyCount === chapters.length}
-          >
-            ⚡ Generar
-          </button>
-          <div style={{ height: 16 }} />
-
-          {/* "Generate this chapter" if applicable? For simplicity, just next/all or manual click on list */}
-
-          <button
-            className="btn"
-            style={{ width: "100%", justifyContent: "center", color: "rgba(255,100,100,0.9)", borderColor: "rgba(255,100,100,0.2)" }}
-            onClick={() => { setSheetOpen(false); onDeleteAudios(); }}
-          >
-            🗑️ Borrar audios de este libro
-          </button>
-        </div>
-
+        )}
       </div>
-    </BottomSheet>
 
-  </div >
-);
+      <BottomSheet open={sheetOpen} title="Gestión de Audio" onClose={() => setSheetOpen(false)}>
+        <div style={{ display: "grid", gap: 20 }}>
+
+          <div>
+            <div className="small muted" style={{ fontWeight: 600, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Voz para generar</div>
+            <div style={{ position: "relative" }}>
+              <select className="select" value={genVoice} onChange={e => {
+                const v = e.target.value as any;
+                setGenVoice(v);
+                setVoice(v); // Update global pref too
+              }}>
+                {VOICES.map(v => (
+                  <option key={v.id} value={v.id}>{v.label}</option>
+                ))}
+              </select>
+              <div style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>⌄</div>
+            </div>
+            <div className="small muted" style={{ marginTop: 6, lineHeight: 1.4 }}>
+              Si generas un capítulo que ya existe, se sustituirá con esta nueva voz.
+            </div>
+          </div>
+
+          <div className="divider" />
+
+          <div>
+            <button
+              className="btn btnPrimary"
+              style={{ width: "100%", justifyContent: "center", fontSize: 16 }}
+              onClick={() => { setSheetOpen(false); void genNextChapter(); }}
+              disabled={busy || readyCount === chapters.length}
+            >
+              ⚡ Generar
+            </button>
+            <div style={{ height: 16 }} />
+
+            {/* "Generate this chapter" if applicable? For simplicity, just next/all or manual click on list */}
+
+            <button
+              className="btn"
+              style={{ width: "100%", justifyContent: "center", color: "rgba(255,100,100,0.9)", borderColor: "rgba(255,100,100,0.2)" }}
+              onClick={() => { setSheetOpen(false); onDeleteAudios(); }}
+            >
+              🗑️ Borrar audios de este libro
+            </button>
+          </div>
+
+        </div>
+      </BottomSheet>
+
+    </div >
+  );
 }
 export default BookScreen;
