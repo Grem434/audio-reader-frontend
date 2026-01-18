@@ -253,19 +253,4 @@ export function toAbsoluteAudioUrl(audioPath: string) {
 }
 
 
-// ---------- CHAT / RAG ----------
-
-export async function processRagIndex(bookId: string) {
-  return apiFetch<{ message: string }>({
-    method: "POST",
-    path: `/api/books/${bookId}/process-rag`,
-  });
-}
-
-export async function chatWithBook(bookId: string, query: string) {
-  return apiFetch<{ answer: string }>({
-    method: "POST",
-    path: `/api/books/${bookId}/chat`,
-    body: { query }
-  });
-}
+// Chat removed

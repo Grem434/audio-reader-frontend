@@ -123,8 +123,74 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     sleepTarget: null as number | null, // timestamp (ms) to stop
   });
 
+  // Supabase Realtime
+  import { supabase } from "../supabase";
+
+  const CLIENT_ID = Math.random().toString(36).slice(2);
+
   // throttle bookmarks para no spamear
   const lastSavedRef = useRef<{ key: string; t: number } | null>(null);
+  // Prevent loops from incoming events
+  const ignoreNextSeekRef = useRef<boolean>(false);
+
+  // Realtime subscription
+  useEffect(() => {
+    if (!supabase) return;
+
+    // We need userId to isolate channels. Assuming userId is in localStorage "audio-reader-user-id"
+    // Ideally this comes from Context, but reading LS is a safe fallback.
+    const userId = localStorage.getItem("audio-reader-user-id");
+    if (!userId) return;
+
+    const channel = supabase.channel(`player-sync:${userId}`, {
+      config: {
+        broadcast: { self: false } // Don't receive own messages if possible, but manual check is safer
+      }
+    });
+
+    channel
+      .on("broadcast", { event: "play" }, (payload) => {
+        if (payload.payload.sender === CLIENT_ID) return;
+        const a = audioRef.current;
+        if (a && a.paused) {
+          // sync time if diff is large
+          if (Math.abs(a.currentTime - payload.payload.time) > 2) {
+            a.currentTime = payload.payload.time;
+          }
+          void a.play();
+        }
+      })
+      .on("broadcast", { event: "pause" }, (payload) => {
+        if (payload.payload.sender === CLIENT_ID) return;
+        audioRef.current?.pause();
+      })
+      .on("broadcast", { event: "seek" }, (payload) => {
+        if (payload.payload.sender === CLIENT_ID) return;
+        const a = audioRef.current;
+        if (a) {
+          ignoreNextSeekRef.current = true;
+          a.currentTime = payload.payload.time;
+        }
+      })
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, []);
+
+  // Helpers to broadcast
+  const broadcast = (event: "play" | "pause" | "seek", time: number) => {
+    if (!supabase) return;
+    const userId = localStorage.getItem("audio-reader-user-id");
+    if (!userId) return;
+
+    void supabase.channel(`player-sync:${userId}`).send({
+      type: "broadcast",
+      event,
+      payload: { sender: CLIENT_ID, time }
+    });
+  };
 
   // crea el <audio> una sola vez
   useEffect(() => {
@@ -136,6 +202,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const onTime = () => {
       const cur = safeNum(a.currentTime, 0);
       const dur = safeNum(a.duration, 0);
+
+      // Detect manual seek (large jump) could be done here or in seekTo helper.
+      // Doing it in seekTo is better.
+
 
       setS((prev) => {
         // Sleep Timer Check
@@ -170,8 +240,17 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       }).catch(() => { });
     };
 
-    const onPlay = () => setS((prev) => ({ ...prev, isPlaying: true }));
-    const onPause = () => setS((prev) => ({ ...prev, isPlaying: false }));
+    const onPlay = () => {
+      setS((prev) => ({ ...prev, isPlaying: true }));
+      broadcast("play", a.currentTime);
+    };
+    const onPause = () => {
+      setS((prev) => ({ ...prev, isPlaying: false }));
+      // Only broadcast pause if not ended (ended logic handles itself)
+      if (a.currentTime < a.duration - 0.5) {
+        broadcast("pause", a.currentTime);
+      }
+    };
     const onEnded = () => {
       // cuando termina, pasa al siguiente si existe
       setS((prev) => {
@@ -414,6 +493,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       seekTo: (sec) => {
         const a = audioRef.current;
         if (!a) return;
+        // Ignore update if it came from sync
+        if (ignoreNextSeekRef.current) {
+          ignoreNextSeekRef.current = false;
+        } else {
+          broadcast("seek", sec);
+        }
         a.currentTime = clamp(sec, 0, Number.isFinite(a.duration) ? a.duration : sec);
         setS((prev) => ({ ...prev, position: a.currentTime }));
       },

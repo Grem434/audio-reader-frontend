@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePlayer } from "../player/PlayerProvider";
 import { BottomSheet } from "../ui/BottomSheet";
+import { Waveform } from "../components/Waveform";
 import { useToast } from "../ui/Toast";
 
 function fmt(sec: number) {
@@ -105,10 +106,24 @@ export function PlayerScreen() {
             background:
               "radial-gradient(520px 260px at 20% 0%, rgba(98,140,255,0.22), transparent 65%), rgba(0,0,0,0.20)"
           }}
+        <div
+          className="card"
+          style={{
+            padding: 18,
+            borderRadius: 22,
+            display: "grid",
+            placeItems: "center",
+            height: 220,
+            background:
+              "radial-gradient(520px 260px at 20% 0%, rgba(98,140,255,0.22), transparent 65%), rgba(0,0,0,0.20)"
+          }}
         >
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 34 }}>🎧</div>
-            <div className="small muted" style={{ marginTop: 6 }}>
+          <div style={{ textAlign: "center", width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}>
+            <div style={{ height: 60, display: "flex", alignItems: "center" }}>
+              <Waveform isPlaying={p.playing} />
+            </div>
+
+            <div className="small muted" style={{ marginTop: 16 }}>
               Velocidad: {p.rate}x
             </div>
           </div>

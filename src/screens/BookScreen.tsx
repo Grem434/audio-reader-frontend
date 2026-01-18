@@ -6,8 +6,8 @@ import { useApp, VOICES } from "../app/AppContext";
 import { useToast } from "../ui/Toast";
 import { usePlayer } from "../player/PlayerProvider";
 import { BottomSheet } from "../ui/BottomSheet";
-import { ChatInterface } from "../components/ChatInterface";
-import { processRagIndex } from "../apiClient";
+
+
 
 // Simple spin animation style
 const spinStyle = document.createElement("style");
@@ -34,7 +34,7 @@ export function BookScreen() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [busyMessage, setBusyMessage] = useState("Cargando...");
-  const [chatOpen, setChatOpen] = useState(false);
+
 
   // Local state for generation preference
 
@@ -230,19 +230,7 @@ export function BookScreen() {
     }
   }
 
-  async function activateAI() {
-    setBusyMessage("Indexando libro (puede tardar)...");
-    setBusy(true);
-    try {
-      await processRagIndex(bookId);
-      toast("Indexación iniciada en segundo plano. Ya puedes usar el chat.");
-      setChatOpen(true);
-    } catch (e: any) {
-      toast("Error indexando: " + e.message);
-    } finally {
-      setBusy(false);
-    }
-  }
+
 
   const LoadingOverlay = () => (
     <div style={{
@@ -414,21 +402,12 @@ export function BookScreen() {
             </button>
             <div style={{ height: 16 }} />
             <div className="divider" />
-            <div style={{ height: 16 }} />
-
-            <button
-              className="btn"
-              style={{ width: "100%", justifyContent: "center", background: "#3b82f6", color: "white", border: "none" }}
-              onClick={() => { setSheetOpen(false); void activateAI(); }}
-            >
-              💬 Activar Chat IA / Abrir Chat
-            </button>
           </div>
 
         </div>
       </BottomSheet>
 
-      {chatOpen && <ChatInterface bookId={bookId} onClose={() => setChatOpen(false)} />}
+
     </div >
   );
 }
