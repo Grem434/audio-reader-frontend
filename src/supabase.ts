@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 
 // Use same env logic as apiClient/main
-const API_URL = (import.meta as any).env?.VITE_BACKEND_URL?.replace(/\/+$/, "") || "https://audio-reader-backend-production.up.railway.app";
+// const API_URL = ... (unused)
 
 // For Realtime, we need the SUPABASE_URL and KEY.
 // BUT wait, your backend provided these to the frontend? 

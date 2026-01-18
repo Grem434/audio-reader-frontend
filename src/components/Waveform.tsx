@@ -1,4 +1,3 @@
-import React from "react";
 import "./Waveform.css";
 
 type Props = {

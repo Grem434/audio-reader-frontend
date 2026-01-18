@@ -106,17 +106,6 @@ export function PlayerScreen() {
             background:
               "radial-gradient(520px 260px at 20% 0%, rgba(98,140,255,0.22), transparent 65%), rgba(0,0,0,0.20)"
           }}
-        <div
-          className="card"
-          style={{
-            padding: 18,
-            borderRadius: 22,
-            display: "grid",
-            placeItems: "center",
-            height: 220,
-            background:
-              "radial-gradient(520px 260px at 20% 0%, rgba(98,140,255,0.22), transparent 65%), rgba(0,0,0,0.20)"
-          }}
         >
           <div style={{ textAlign: "center", width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}>
             <div style={{ height: 60, display: "flex", alignItems: "center" }}>

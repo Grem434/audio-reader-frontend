@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { getContinue, saveBookmark } from "../apiClient";
+import { supabase } from "../supabase";
 
 type ChapterLite = {
   id: string;
@@ -105,6 +106,8 @@ function audioUrlFromPath(audio_path: string): string {
   return `${origin}${cleanPath}`;
 }
 
+const CLIENT_ID = Math.random().toString(36).slice(2);
+
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -122,11 +125,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     duration: 0,
     sleepTarget: null as number | null, // timestamp (ms) to stop
   });
-
-  // Supabase Realtime
-  import { supabase } from "../supabase";
-
-  const CLIENT_ID = Math.random().toString(36).slice(2);
 
   // throttle bookmarks para no spamear
   const lastSavedRef = useRef<{ key: string; t: number } | null>(null);
@@ -149,7 +147,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     });
 
     channel
-      .on("broadcast", { event: "play" }, (payload) => {
+      .on("broadcast", { event: "play" }, (payload: any) => {
         if (payload.payload.sender === CLIENT_ID) return;
         const a = audioRef.current;
         if (a && a.paused) {
@@ -160,11 +158,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           void a.play();
         }
       })
-      .on("broadcast", { event: "pause" }, (payload) => {
+      .on("broadcast", { event: "pause" }, (payload: any) => {
         if (payload.payload.sender === CLIENT_ID) return;
         audioRef.current?.pause();
       })
-      .on("broadcast", { event: "seek" }, (payload) => {
+      .on("broadcast", { event: "seek" }, (payload: any) => {
         if (payload.payload.sender === CLIENT_ID) return;
         const a = audioRef.current;
         if (a) {
@@ -175,7 +173,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       .subscribe();
 
     return () => {
-      void supabase.removeChannel(channel);
+      void supabase?.removeChannel(channel);
     };
   }, []);
 
