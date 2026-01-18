@@ -160,21 +160,23 @@ export function BookScreen() {
     setBusyMessage(ch.audio_path ? "Descargando..." : "Generando y descargando...");
     setBusy(true);
     try {
-      let url = "";
       if (ch.audio_path) {
-        url = toAbsoluteAudioUrl(ch.audio_path);
+        // Already exists, just cache it
+        const url = toAbsoluteAudioUrl(ch.audio_path);
+        await fetch(url, { mode: "cors", cache: "reload" });
+        toast(`Capítulo ${ch.index_in_book + 1} descargado.`);
       } else {
-        // Generate via stream URL
-        url = getStreamUrl(bookId, ch.id, genVoice, "learning");
-      }
-
-      // Fetch to trigger generation/caching
-      await fetch(url, { mode: "cors", cache: "reload" });
-
-      toast(`Capítulo ${ch.index_in_book + 1} guardado en dispositivo.`);
-
-      // If it was new, refresh to get the permanent path
-      if (!ch.audio_path) {
+        // Not exists: generate robustly
+        setBusyMessage("Generando en servidor (espera)...");
+        await generateAudioRange({
+          userId,
+          bookId,
+          startIndex: ch.index_in_book,
+          endIndex: ch.index_in_book,
+          voice: genVoice,
+          style: "learning"
+        });
+        toast(`Capítulo ${ch.index_in_book + 1} generado y guardado.`);
         void refresh();
       }
     } catch (err: any) {
