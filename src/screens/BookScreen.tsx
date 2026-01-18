@@ -327,6 +327,7 @@ export function BookScreen() {
                       gap: 10
                     }}
                     onClick={() => {
+                      // UNIFIED PLAY: If ready, play file. If not, play stream.
                       if (isReady) void playIndex(idx);
                       else void playStream(idx);
                     }}
@@ -337,20 +338,26 @@ export function BookScreen() {
                         {label}
                       </div>
                       <div className="small muted">
-                        {isReady ? `🎧 Listo (${voiceLabel})` : "📡 Toca para escuchar (Stream)"}
+                        {/* Simplify Status Text: Just voice info or duration if we had it */}
+                        {voiceLabel}
                       </div>
                     </div>
 
-                    {/* Download/Generate Button */}
+                    {/* Download/Offline Action */}
                     <div
-                      style={{ fontSize: 18, padding: 8, zIndex: 5, opacity: isReady ? 1 : 0.7 }}
-                      onClick={(e) => void downloadToCache(idx, e)}
-                      title={isReady ? "Descargar para Offline" : "Generar y Descargar"}
+                      style={{ fontSize: 18, padding: 8, zIndex: 5, opacity: isReady ? 0.5 : 1 }}
+                      onClick={(e) => {
+                        if (!isReady) void downloadToCache(idx, e);
+                        else e.stopPropagation(); // Already saved
+                      }}
+                      // Display: Cloud if needs download, Check/Disk if saved
+                      title={isReady ? "Guardado en dispositivo" : "Descargar para escuchar offline"}
                     >
-                      {isReady ? "💾" : "☁️"}
+                      {isReady ? "✅" : "⬇️"}
                     </div>
 
-                    <div style={{ fontSize: 18 }}>{isReady ? "▶" : "📡"}</div>
+                    {/* Play Button is ALWAYS visible now */}
+                    <div style={{ fontSize: 18 }}>▶</div>
                   </div>
                 </div>
               );
