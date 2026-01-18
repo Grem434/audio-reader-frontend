@@ -155,23 +155,30 @@ export function BookScreen() {
   async function downloadToCache(index: number, e: React.MouseEvent) {
     e.stopPropagation();
     const ch = chapters[index];
-    if (!ch || !ch.audio_path) {
-      toast("No hay audio generado para descargar.");
-      return;
-    }
+    if (!ch) return;
 
-    setBusyMessage("Descargando...");
+    setBusyMessage(ch.audio_path ? "Descargando..." : "Generando y descargando...");
     setBusy(true);
     try {
-      const url = toAbsoluteAudioUrl(ch.audio_path);
-      // Explicit fetch to trigger SW caching
+      let url = "";
+      if (ch.audio_path) {
+        url = toAbsoluteAudioUrl(ch.audio_path);
+      } else {
+        // Generate via stream URL
+        url = getStreamUrl(bookId, ch.id, genVoice, "learning");
+      }
+
+      // Fetch to trigger generation/caching
       await fetch(url, { mode: "cors", cache: "reload" });
-      // We use cache: 'reload' (or similar) or just normal fetch. 
-      // Since SW uses CacheFirststrategy for .mp3, fetching it once should store it.
-      // Actually, for CacheFirst, checking if it is in cache is better, but fetching puts it there.
-      toast(`Capítulo ${ch.index_in_book + 1} descargado.`);
+
+      toast(`Capítulo ${ch.index_in_book + 1} guardado en dispositivo.`);
+
+      // If it was new, refresh to get the permanent path
+      if (!ch.audio_path) {
+        void refresh();
+      }
     } catch (err: any) {
-      toast("Error descargando: " + err.message);
+      toast("Error descarga: " + err.message);
     } finally {
       setBusy(false);
     }
@@ -334,16 +341,14 @@ export function BookScreen() {
                       </div>
                     </div>
 
-                    {/* Download Button (Only if ready) */}
-                    {isReady && (
-                      <div
-                        style={{ fontSize: 18, padding: 8, zIndex: 5 }}
-                        onClick={(e) => void downloadToCache(idx, e)}
-                        title="Descargar para Offline"
-                      >
-                        💾
-                      </div>
-                    )}
+                    {/* Download/Generate Button */}
+                    <div
+                      style={{ fontSize: 18, padding: 8, zIndex: 5, opacity: isReady ? 1 : 0.7 }}
+                      onClick={(e) => void downloadToCache(idx, e)}
+                      title={isReady ? "Descargar para Offline" : "Generar y Descargar"}
+                    >
+                      {isReady ? "💾" : "☁️"}
+                    </div>
 
                     <div style={{ fontSize: 18 }}>{isReady ? "▶" : "📡"}</div>
                   </div>
