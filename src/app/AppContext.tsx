@@ -10,7 +10,7 @@ const LS_STYLE = "audio-reader-style";
 /** 👇 Estos exports SON los que tu BookScreen está importando */
 export const VOICES = [
   { id: "echo", label: "Masculina (Echo)" },
-  { id: "shimmer", label: "Femenina (Shimmer)" },
+  { id: "nova", label: "Femenina (Nova)" },
 ] as const;
 
 // Styles "restored" but hidden from UI to satisfy types

@@ -43,6 +43,10 @@ type PlayerContextValue = {
   nowTitle: string;
   nowSubtitle: string;
 
+  // Exposed state for UI
+  chapters: ChapterLite[];
+  index: number;
+
   // acciones
   playChapter: (args: PlayChapterArgs) => Promise<void>;
   resumeBook: (bookId: string, bookTitle: string, chapters: ChapterLite[], voice: string, style: string) => Promise<boolean>;
@@ -341,6 +345,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         return t;
       })(),
 
+      chapters: s.chapters,
+      index: s.index,
+
       setVoice: (v) => setS((prev) => ({ ...prev, voice: v })),
       setStyle: (st) => setS((prev) => ({ ...prev, style: st })),
 
@@ -431,7 +438,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setRate: (r) => setS((prev) => ({ ...prev, rate: clamp(r, 0.5, 3) })),
 
       recap: async () => {
-        const { bookId, chapterId, position, style, userId } = s as any; // userId might be missing in 's', check AppContext or pass it?
+        const { bookId, chapterId, position, style } = s as any; // userId might be missing in 's', check AppContext or pass it?
         // Wait, 's' (PlayerState) doesn't have userId. We need it from somewhere. 
         // We can ignore it if apiClient handles it via global auth or if we pass nothing (but backend needs it).
         // Actually, PlayerProvider doesn't readily know 'userId' unless we pass it or store it in 's'.

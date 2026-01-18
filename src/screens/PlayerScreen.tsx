@@ -210,6 +210,30 @@ export function PlayerScreen() {
       {/* Settings sheet */}
       <BottomSheet open={sheetOpen} title="Ajustes de reproducción" onClose={() => setSheetOpen(false)}>
         <div style={{ display: "grid", gap: 12 }}>
+          {/* NEW: Chapter Summary Button */}
+          <button
+            className="btn btnPrimary"
+            onClick={() => {
+              setSheetOpen(false);
+              const ch = p.chapters[p.index];
+              if ((ch as any).summary) {
+                // Show in alert for now or a custom modal. 
+                // Using toast might be too short for a summary.
+                // Let's toggle a "summary view" or just alert() since it's simple MVP.
+                // Or better, navigate to a new screen / overlay? 
+                // Let's use a simple native alert for the "WOW" effect of having it, 
+                // or reuse the BottomSheet concept if possible.
+                // Actually, let's put it in a Toast? No, too long.
+                // Let's use a simple JS confirm/alert logic or a new state for "Reading Summary".
+                alert("Resumen del Capítulo:\n\n" + (ch as any).summary);
+              } else {
+                toast("Este capítulo no tiene resumen generado.");
+              }
+            }}
+          >
+            📄 Ver Resumen del Capítulo
+          </button>
+
           <div className="card" style={{ padding: 12 }}>
             <div style={{ fontWeight: 950, marginBottom: 8 }}>Velocidad</div>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
