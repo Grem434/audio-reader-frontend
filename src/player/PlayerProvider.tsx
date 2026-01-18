@@ -31,6 +31,7 @@ type PlayerState = {
   rate: number;
   position: number;
   duration: number;
+  sleepTarget: number | null;
 };
 
 type PlayerContextValue = {
