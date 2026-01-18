@@ -131,6 +131,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // Prevent loops from incoming events
   const ignoreNextSeekRef = useRef<boolean>(false);
 
+  // Ref to hold latest state for event handlers
+  const currentStateRef = useRef<PlayerState>(s);
+  useEffect(() => { currentStateRef.current = s; }, [s]);
+
   // Realtime subscription
   useEffect(() => {
     if (!supabase) return;
@@ -147,15 +151,40 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     });
 
     channel
-      .on("broadcast", { event: "play" }, (payload: any) => {
-        if (payload.payload.sender === CLIENT_ID) return;
-        const a = audioRef.current;
-        if (a && a.paused) {
-          // sync time if diff is large
-          if (Math.abs(a.currentTime - payload.payload.time) > 2) {
-            a.currentTime = payload.payload.time;
+      .on("broadcast", { event: "play" }, async (p: any) => {
+        const payload = p.payload;
+        if (payload.sender === CLIENT_ID) return;
+
+        // Sync Context (Chapter Switch)
+        // Note: We need access to the LATEST 's' to compare.
+        // Inside useEffect[], 's' is stale (initial state).
+        // We must use a ref to access current state without re-subscribing.
+        const currentS = currentStateRef.current; // We need to create this ref!
+
+        if (payload.bookId && payload.bookId === currentS.bookId) {
+          // Same book
+          if (payload.chapterId && payload.chapterId !== currentS.chapterId) {
+            // Different chapter! Switch
+            const newIdx = currentS.chapters.findIndex(c => c.id === payload.chapterId);
+            if (newIdx >= 0) {
+              // We found the chapter in our list. Switch to it.
+              // We need to call loadAndPlayByIndex... but that updates state.
+              // The broadcast will continue playing.
+              // We also need access to loadAndPlayByIndex here...
+              // It is defined in the component scope, so we can call it.
+              // But we should await it?
+              await loadAndPlayByIndex(currentS.chapters, newIdx, currentS.bookId, currentS.bookTitle!, currentS.voice, currentS.style, payload.time);
+            }
           }
-          void a.play();
+        }
+
+        const a = audioRef.current;
+        if (a) {
+          // Sync time always (if large diff)
+          if (Math.abs(a.currentTime - payload.time) > 2) {
+            a.currentTime = payload.time;
+          }
+          if (a.paused) void a.play();
         }
       })
       .on("broadcast", { event: "pause" }, (payload: any) => {
@@ -183,10 +212,18 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const userId = localStorage.getItem("audio-reader-user-id");
     if (!userId) return;
 
+    // Use current state 's' to broadcast context
+    const payload = {
+      sender: CLIENT_ID,
+      time,
+      bookId: s.bookId,
+      chapterId: s.chapterId
+    };
+
     void supabase.channel(`player-sync:${userId}`).send({
       type: "broadcast",
       event,
-      payload: { sender: CLIENT_ID, time }
+      payload
     });
   };
 
@@ -388,7 +425,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     a.playbackRate = s.rate;
   }, [s.rate]);
 
-  async function loadAndPlayByIndex(chapters: ChapterLite[], idx: number, bookId: string, bookTitle: string, voice: string, style: string) {
+  async function loadAndPlayByIndex(chapters: ChapterLite[], idx: number, bookId: string, bookTitle: string, voice: string, style: string, startTime: number = 0) {
     const a = audioRef.current;
     if (!a) return;
 
@@ -400,7 +437,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     // carga
     a.pause();
     a.src = url;
-    a.currentTime = 0;
+    a.currentTime = startTime;
 
     setS((prev) => ({
       ...prev,
@@ -411,7 +448,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       chapterId: ch.id,
       voice,
       style,
-      position: 0,
+      position: startTime,
       duration: 0,
     }));
 
