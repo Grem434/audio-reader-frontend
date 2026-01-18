@@ -76,8 +76,32 @@ export default defineConfig({
             }
           },
           {
+            // API calls (Summaries, Book Lists, etc.) -> NetworkFirst
             urlPattern: ({ url }) => url.pathname.startsWith("/api/"),
-            handler: "NetworkOnly"
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "api-data",
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 24 * 7 // 7 días
+              },
+              networkTimeoutSeconds: 5 // Si falla en 5s, usa caché
+            }
+          },
+          {
+            // Audios (MP3) -> CacheFirst
+            urlPattern: ({ url }) => url.pathname.endsWith(".mp3") || url.pathname.includes("/audio/"),
+            handler: "CacheFirst",
+            options: {
+              cacheName: "audio-cache",
+              expiration: {
+                maxEntries: 50,
+                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 días
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
           }
         ]
       }

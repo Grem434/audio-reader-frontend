@@ -163,6 +163,12 @@ export async function generateMissing(args: { userId?: string | null; bookId: st
   });
 }
 
+export function getStreamUrl(bookId: string, chapterId: string, voice?: string, style?: string) {
+  const v = voice || DEFAULT_VOICE;
+  const s = style || DEFAULT_STYLE;
+  return `${API_BASE}/api/books/${bookId}/chapters/${chapterId}/stream?voice=${encodeURIComponent(v)}&style=${encodeURIComponent(s)}`;
+}
+
 // ---------- BOOKMARKS / CONTINUE ----------
 
 export async function getContinue(args: { userId?: string | null; bookId: string; voice?: string; style?: string }) {
@@ -244,4 +250,22 @@ export function toAbsoluteAudioUrl(audioPath: string) {
   if (!audioPath) return "";
   if (/^https?:\/\//i.test(audioPath)) return audioPath;
   return `${API_BASE}${audioPath.startsWith("/") ? "" : "/"}${audioPath}`;
+}
+
+
+// ---------- CHAT / RAG ----------
+
+export async function processRagIndex(bookId: string) {
+  return apiFetch<{ message: string }>({
+    method: "POST",
+    path: `/api/books/${bookId}/process-rag`,
+  });
+}
+
+export async function chatWithBook(bookId: string, query: string) {
+  return apiFetch<{ answer: string }>({
+    method: "POST",
+    path: `/api/books/${bookId}/chat`,
+    body: { query }
+  });
 }

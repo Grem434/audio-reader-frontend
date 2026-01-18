@@ -445,7 +445,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         // Quick fix: assume apiClient might have a way or just pass null and hope backend handles it via session (it doesn't, it demands header).
         // Best approach: Add userId to PlayerState or useContext.
         // HACK: We can read localStorage directly here to avoid large refactors, matching AppContext logic.
-        const storedUserId = localStorage.getItem("audio-reader-userid");
+        const storedUserId = localStorage.getItem("audio-reader-user-id");
 
         if (!bookId || !chapterId) throw new Error("No hay capítulo activo");
 

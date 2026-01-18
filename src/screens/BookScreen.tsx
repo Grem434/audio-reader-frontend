@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { deleteAudios, generateAudioRange, getBook } from "../apiClient";
+import { deleteAudios, generateAudioRange, getBook, getStreamUrl, toAbsoluteAudioUrl } from "../apiClient";
 import type { Chapter } from "../types";
 import { useApp, VOICES } from "../app/AppContext";
 import { useToast } from "../ui/Toast";
 import { usePlayer } from "../player/PlayerProvider";
 import { BottomSheet } from "../ui/BottomSheet";
+import { ChatInterface } from "../components/ChatInterface";
+import { processRagIndex } from "../apiClient";
 
 // Simple spin animation style
 const spinStyle = document.createElement("style");
@@ -32,6 +34,9 @@ export function BookScreen() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [busyMessage, setBusyMessage] = useState("Cargando...");
+  const [chatOpen, setChatOpen] = useState(false);
+
+  // Local state for generation preference
 
   // Local state for generation preference
   const [genVoice, setGenVoice] = useState(defaultVoice);
@@ -110,6 +115,68 @@ export function BookScreen() {
 
 
 
+
+  // New: Play via Stream
+  async function playStream(index: number) {
+    const ch = chapters[index];
+    if (!ch) return;
+
+    setBusyMessage("Iniciando stream...");
+    setBusy(true); // Show loading briefly
+    try {
+      // Construct the chapters list with this one "patched" with the stream URL
+      const streamUrl = getStreamUrl(bookId, ch.id, genVoice, "learning");
+
+      // Clone and patch
+      const patchedChapters = chapters.map((c, i) => {
+        if (i === index) {
+          return { ...c, audio_path: streamUrl, voice: genVoice, style: "learning" };
+        }
+        return c;
+      });
+
+      await player.playChapter({
+        bookId,
+        bookTitle,
+        chapters: patchedChapters,
+        index,
+        voice: genVoice,
+        style: "learning"
+      });
+      nav("/player");
+    } catch (e: any) {
+      console.error(e);
+      toast("Error iniciando stream: " + e?.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function downloadToCache(index: number, e: React.MouseEvent) {
+    e.stopPropagation();
+    const ch = chapters[index];
+    if (!ch || !ch.audio_path) {
+      toast("No hay audio generado para descargar.");
+      return;
+    }
+
+    setBusyMessage("Descargando...");
+    setBusy(true);
+    try {
+      const url = toAbsoluteAudioUrl(ch.audio_path);
+      // Explicit fetch to trigger SW caching
+      await fetch(url, { mode: "cors", cache: "reload" });
+      // We use cache: 'reload' (or similar) or just normal fetch. 
+      // Since SW uses CacheFirststrategy for .mp3, fetching it once should store it.
+      // Actually, for CacheFirst, checking if it is in cache is better, but fetching puts it there.
+      toast(`Capítulo ${ch.index_in_book + 1} descargado.`);
+    } catch (err: any) {
+      toast("Error descargando: " + err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function genNextChapter() {
     setBusyMessage("Generando audio...");
     setBusy(true);
@@ -149,6 +216,20 @@ export function BookScreen() {
       await refresh();
     } catch (e: any) {
       toast(e?.message || "Error borrando audios");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function activateAI() {
+    setBusyMessage("Indexando libro (puede tardar)...");
+    setBusy(true);
+    try {
+      await processRagIndex(bookId);
+      toast("Indexación iniciada en segundo plano. Ya puedes usar el chat.");
+      setChatOpen(true);
+    } catch (e: any) {
+      toast("Error indexando: " + e.message);
     } finally {
       setBusy(false);
     }
@@ -240,7 +321,7 @@ export function BookScreen() {
                     }}
                     onClick={() => {
                       if (isReady) void playIndex(idx);
-                      else setSheetOpen(true); // Offer to generate if clicked
+                      else void playStream(idx);
                     }}
                   >
                     <div style={{ fontWeight: 950, fontSize: 14, minWidth: 42 }}>{ch.index_in_book + 1}.</div>
@@ -249,10 +330,22 @@ export function BookScreen() {
                         {label}
                       </div>
                       <div className="small muted">
-                        {isReady ? `🎧 Listo (${voiceLabel})` : "— Sin audio"}
+                        {isReady ? `🎧 Listo (${voiceLabel})` : "📡 Toca para escuchar (Stream)"}
                       </div>
                     </div>
-                    <div style={{ fontSize: 18 }}>{isReady ? "▶" : "⚡"}</div>
+
+                    {/* Download Button (Only if ready) */}
+                    {isReady && (
+                      <div
+                        style={{ fontSize: 18, padding: 8, zIndex: 5 }}
+                        onClick={(e) => void downloadToCache(idx, e)}
+                        title="Descargar para Offline"
+                      >
+                        💾
+                      </div>
+                    )}
+
+                    <div style={{ fontSize: 18 }}>{isReady ? "▶" : "📡"}</div>
                   </div>
                 </div>
               );
@@ -305,11 +398,23 @@ export function BookScreen() {
             >
               🗑️ Borrar audios de este libro
             </button>
+            <div style={{ height: 16 }} />
+            <div className="divider" />
+            <div style={{ height: 16 }} />
+
+            <button
+              className="btn"
+              style={{ width: "100%", justifyContent: "center", background: "#3b82f6", color: "white", border: "none" }}
+              onClick={() => { setSheetOpen(false); void activateAI(); }}
+            >
+              💬 Activar Chat IA / Abrir Chat
+            </button>
           </div>
 
         </div>
       </BottomSheet>
 
+      {chatOpen && <ChatInterface bookId={bookId} onClose={() => setChatOpen(false)} />}
     </div >
   );
 }
