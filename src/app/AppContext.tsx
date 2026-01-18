@@ -9,7 +9,9 @@ const LS_STYLE = "audio-reader-style";
 
 /** 👇 Estos exports SON los que tu BookScreen está importando */
 export const VOICES = [
-  { id: "echo", label: "Masculina (Echo)" },
+  { id: "echo", label: "Masculina (Echo - Suave)" },
+  { id: "onyx", label: "Masculina (Onyx - Profunda)" },
+  { id: "alloy", label: "Masculina (Alloy - Neutra)" },
   { id: "nova", label: "Femenina (Nova)" },
 ] as const;
 
@@ -40,7 +42,7 @@ const Ctx = createContext<AppCtx | null>(null);
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [userId, setUserId] = useState<string>("");
   // Force default voice to avoid build error and ensure consistency
-  const [voice, setVoiceState] = useState<VoiceId>(VOICES[0].id);
+  const [voice, setVoiceState] = useState<VoiceId>(VOICES[2].id); // Default to Alloy (Neutral)
 
   const [style, setStyleState] = useState<StyleId>(() => {
     const saved = localStorage.getItem(LS_STYLE) as StyleId | null;

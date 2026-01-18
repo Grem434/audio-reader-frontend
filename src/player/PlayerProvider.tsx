@@ -65,6 +65,10 @@ type PlayerContextValue = {
 
   recap: () => Promise<string>; // si no lo usas, devuelve ""
 
+  // Sleep Timer
+  sleepTarget: number | null;
+  setSleepTimer: (minutes: number) => void;
+
   // helpers para otros sitios (por si algo los usa)
   setVoice: (v: string) => void;
   setStyle: (s: string) => void;
@@ -115,6 +119,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     rate: 1,
     position: 0,
     duration: 0,
+    sleepTarget: null as number | null, // timestamp (ms) to stop
   });
 
   // throttle bookmarks para no spamear
@@ -131,11 +136,18 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       const cur = safeNum(a.currentTime, 0);
       const dur = safeNum(a.duration, 0);
 
-      setS((prev) => ({
-        ...prev,
-        position: cur,
-        duration: dur || prev.duration,
-      }));
+      setS((prev) => {
+        // Sleep Timer Check
+        if (prev.sleepTarget && Date.now() > prev.sleepTarget) {
+          a.pause();
+          return { ...prev, isPlaying: false, sleepTarget: null, position: cur, duration: dur || prev.duration };
+        }
+        return {
+          ...prev,
+          position: cur,
+          duration: dur || prev.duration,
+        };
+      });
 
       // bookmark automático (cada ~1.5s)
       const { bookId, chapterId, voice, style } = s;
@@ -436,6 +448,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       },
 
       setRate: (r) => setS((prev) => ({ ...prev, rate: clamp(r, 0.5, 3) })),
+
+      sleepTarget: s.sleepTarget,
+      setSleepTimer: (minutes) => {
+        if (minutes <= 0) setS(prev => ({ ...prev, sleepTarget: null }));
+        else setS(prev => ({ ...prev, sleepTarget: Date.now() + minutes * 60 * 1000 }));
+      },
 
       recap: async () => {
         const { bookId, chapterId, position, style } = s as any; // userId might be missing in 's', check AppContext or pass it?

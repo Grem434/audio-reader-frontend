@@ -250,14 +250,30 @@ export function PlayerScreen() {
           </div>
 
           <div className="card" style={{ padding: 12 }}>
-            <div style={{ fontWeight: 950, marginBottom: 8 }}>Acciones</div>
-            <button className="btn" onClick={() => { p.seekBy(-10); setSheetOpen(false); }}>
-              ↺ 10 segundos
-            </button>
             <div style={{ height: 10 }} />
             <button className="btn" onClick={() => { p.seekBy(10); setSheetOpen(false); }}>
               10 segundos ↻
             </button>
+          </div>
+
+          <div className="card" style={{ padding: 12 }}>
+            <div style={{ fontWeight: 950, marginBottom: 8 }}>Temporizador (Sleep Timer)</div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {[0, 5, 15, 30, 60].map(m => (
+                <button
+                  key={m}
+                  className={`btn ${(!m && !p.sleepTarget) || (m && p.sleepTarget && Math.abs((p.sleepTarget - Date.now()) / 60000 - m) < 5) ? "btnPrimary" : ""}`}
+                  onClick={() => { p.setSleepTimer(m); if (m === 0) toast("Temporizador apagado"); else toast(`Apagado en ${m} min`); }}
+                >
+                  {m === 0 ? "Off" : `${m}m`}
+                </button>
+              ))}
+            </div>
+            {p.sleepTarget && (
+              <div className="small muted" style={{ marginTop: 6 }}>
+                Se detendrá a las {new Date(p.sleepTarget).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </div>
+            )}
           </div>
 
           <div className="small muted">
