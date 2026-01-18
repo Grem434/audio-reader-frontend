@@ -60,7 +60,25 @@ export function ChatInterface({ bookId, onClose }: Props) {
                 background: "#15171b"
             }}>
                 <div style={{ fontWeight: "bold" }}>💬 Chat con el Libro</div>
-                <button onClick={onClose} style={{ background: "transparent", border: "none", fontSize: 24, cursor: "pointer" }}>✖</button>
+                <div style={{ display: "flex", gap: 10 }}>
+                    <button
+                        onClick={async () => {
+                            if (confirm("¿Indexar este libro para el chat? (Puede tardar unos segundos)")) {
+                                try {
+                                    // Import dynamically to avoid top-level issues if not needed
+                                    const { processRagIndex } = await import("../apiClient");
+                                    await processRagIndex(bookId);
+                                    alert("Indexación iniciada en segundo plano. Espera unos segundos y pregunta.");
+                                } catch (e) {
+                                    alert("Error iniciando indexación");
+                                }
+                            }
+                        }}
+                        style={{ background: "#2563eb", border: "none", color: "white", padding: "4px 8px", borderRadius: 4, cursor: "pointer", fontSize: 12 }}>
+                        🧠 Preparar
+                    </button>
+                    <button onClick={onClose} style={{ background: "transparent", border: "none", fontSize: 24, cursor: "pointer", color: "white" }}>✖</button>
+                </div>
             </div>
 
             {/* Messages */}
