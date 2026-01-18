@@ -173,7 +173,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
               // We also need access to loadAndPlayByIndex here...
               // It is defined in the component scope, so we can call it.
               // But we should await it?
-              await loadAndPlayByIndex(currentS.chapters, newIdx, currentS.bookId, currentS.bookTitle!, currentS.voice, currentS.style, payload.time);
+              await loadAndPlayByIndex(currentS.chapters, newIdx, currentS.bookId!, currentS.bookTitle!, currentS.voice, currentS.style, payload.time);
             }
           }
         }
