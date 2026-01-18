@@ -5,6 +5,7 @@ import { PlayerScreen } from "./screens/PlayerScreen";
 import { AuthScreen } from "./screens/AuthScreen";
 import { RecoveryScreen } from "./screens/RecoveryScreen";
 import { useApp } from "./app/AppContext";
+import { FloatingPlayer } from "./components/FloatingPlayer";
 
 export default function App() {
   const { userId, authLoading, signOut } = useApp();
@@ -43,8 +44,11 @@ export default function App() {
         <Route path="/library" element={<LibraryScreen />} />
         <Route path="/book/:bookId" element={<BookScreen />} />
         <Route path="/player" element={<PlayerScreen />} />
+        <Route path="/player" element={<PlayerScreen />} />
         <Route path="*" element={<Navigate to="/library" replace />} />
       </Routes>
+
+      <FloatingPlayer />
     </>
   );
 }

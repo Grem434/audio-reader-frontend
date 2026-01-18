@@ -29,7 +29,7 @@ export function PlayerScreen() {
 
 
 
-  async function onRecap() {
+  async function onCopyRecap() {
     try {
       const text = await p.recap();
       if (!text) {
@@ -188,7 +188,7 @@ export function PlayerScreen() {
         </div>
 
         <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
-          <button className="btn" onClick={onRecap} style={{ flex: 1 }}>
+          <button className="btn" onClick={onCopyRecap} style={{ flex: 1 }}>
             🧠 Resumen (copiar)
           </button>
           <button
